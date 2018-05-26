@@ -15,7 +15,7 @@ extensions [array]
 
 ;;;
 
-players-own [ init_xcor init_ycor has_gold is_cool Q_values iamTurtle]
+players-own [ init_xcor init_ycor has_gold is_cool Q_values iamTurtle reward total_reward]
 ;pits-own [ init_xcor init_ycor ]
 
 
@@ -49,14 +49,19 @@ to summon-players
    set init_xcor 8
    set init_ycor 8
    set has_gold 0
+   set reward 0
+   set total_reward 0
     set Q_values init-Q-values
     setxy init_xcor init_ycor
+
   ]
       create-players 1
   [
    set init_xcor -8
    set init_ycor -8
    set has_gold 0
+   set reward 0
+   set total_reward 0
     set Q_values init-Q-values
     setxy init_xcor init_ycor
   ]
@@ -65,6 +70,8 @@ to summon-players
    set init_xcor 8
    set init_ycor -8
    set has_gold 0
+   set reward 0
+   set total_reward 0
     set Q_values init-Q-values
     setxy init_xcor init_ycor
   ]
@@ -73,6 +80,8 @@ to summon-players
    set init_xcor -8
    set init_ycor  8
    set has_gold 0
+   set reward 0
+   set total_reward 0
    set Q_values init-Q-values
     setxy init_xcor init_ycor
   ]
@@ -126,6 +135,7 @@ to reset
    set xcor init_xcor
    set ycor init_ycor
    set has_gold 0
+   set total_reward 0
   ]
    ;; new pits ?
    set epoch (epoch + 1)
@@ -145,21 +155,32 @@ end
 
 
 to agent-loop
-  let cnt 0
   set currentTurtle 0
-  ;; let  a [xcor] of turtle currentTurtle
+  ;; loops through all agents
   while [ currentTurtle != 4]
   [
     if is-turtle? turtle currentTurtle
     [
-   ; go-random
-      let cur_xcor ([xcor] of turtle currentTurtle) + 8
-      let cur_ycor ([ycor] of turtle currentTurtle) + 8
+      ; go-random ; <<< naive agent
+      let cur_xcor ([xcor] of turtle currentTurtle)
+      let cur_ycor ([ycor] of turtle currentTurtle)
 
-      go-next next-move cur_xcor cur_ycor
+      ; determines where it should move
+      let cur_move next-move cur_xcor cur_ycor
+     ; let cur_reward (get-Q-value cur_xcor cur_ycor cur_move)
+      ; gets the reward from the upcoming move
+      ask turtle currentTurtle [set reward get-reward cur_move ]
+      ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
+
+      ;; Updates the environment
+      update-Q-value cur_move cur_xcor cur_ycor
+      go-next cur_move
+
+
     ]
     set currentTurtle currentTurtle + 1
   ;;  print currentTurtle
+
 
   ]
 end
@@ -281,8 +302,17 @@ to-report init-Q-values
 end
 
 to-report get-Q-values [x y]
- ;  print array:item (array:item (array:item ( [Q_values] of turtle currentTurtle ) x) y ) 0
-  report array:item (array:item ( [Q_values] of turtle currentTurtle ) x) y
+
+  report array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8))( y + 8)
+end
+
+to-report get-Q-value [x y move]
+  report array:item ( array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8)) (y + 8) ) move
+end
+
+;; sets the value for the current agent
+to set-agent-Q-value [x y move val ]
+ ask turtle currentTurtle [ array:set (get-Q-values x  y  ) move val]
 end
 
 
@@ -304,12 +334,95 @@ to-report can-exit
 
 end
 
+to-report max_q_val [ x y move]
+   let loc_x x
+   let loc_y y
+      ifelse move = 0
+   [ set loc_y (loc_y - 1 )
+      if loc_y = -9
+      [set loc_y -8]
+  ]
+  [ifelse move = 1
+    [set loc_x (loc_x + 1)
+      if loc_x = 9
+      [set loc_x 8]
+    ]
+    [ifelse move = 2
+      [ set loc_y (loc_y + 1 )
+        if loc_y = 9
+        [set loc_y 8]
+      ]
+        [ set loc_x (loc_x - 1)
+        if loc_x = -9
+        [set loc_x -8] ]]]
+
+   report max array:to-list get-q-values loc_x loc_y
+end
+
+to-report get-next-move [ x y move]
+  let loc_x x
+   let loc_y y
+      ifelse move = 0
+   [ set loc_y (loc_y - 1 )
+      if loc_y = -9
+      [set loc_y -8]
+  ]
+  [ifelse move = 1
+    [set loc_x (loc_x + 1)
+      if loc_x = 9
+      [set loc_x 8]
+    ]
+    [ifelse move = 2
+      [ set loc_y (loc_y + 1 )
+        if loc_y = 9
+        [set loc_y 8]
+      ]
+        [ set loc_x (loc_x - 1)
+        if loc_x = -9
+        [set loc_x -8] ]]]
+
+    report next-move loc_x loc_y
+
+end
+
+to-report get-next-q-value [ x y move new_move]
+     let loc_x x
+   let loc_y y
+      ifelse move = 0
+   [ set loc_y (loc_y - 1 )
+      if loc_y = -9
+      [set loc_y -8]
+  ]
+  [ifelse move = 1
+    [set loc_x (loc_x + 1)
+      if loc_x = 9
+      [set loc_x 8]
+    ]
+    [ifelse move = 2
+      [ set loc_y (loc_y + 1 )
+        if loc_y = 9
+        [set loc_y 8]
+      ]
+        [ set loc_x (loc_x - 1)
+        if loc_x = -9
+        [set loc_x -8] ]]]
+
+    report get-q-value loc_x loc_y new_move
+end
+
 ;;; Reinforcement Learning
 
 to-report next-move [x y]
   ifelse move_algo = "Greedy"
      [report new-move-e-greedy x y]
   []
+end
+
+to update-Q-value [ move x y]
+  ifelse reward_algo = "Q learning"
+  [ update-Q-learning move x y]
+  [ update-SARSA move x y]
+
 end
 
 to-report new-move-e-greedy [ x y]
@@ -329,8 +442,82 @@ to-report new-move-e-greedy [ x y]
 
 end
 
+to-report get-reward [ move ]
+
+  let cur_xcor ([xcor] of turtle currentTurtle)
+  let cur_ycor ([ycor] of turtle currentTurtle)
+  ;did it grab the gold
+  ifelse move = 4
+  [
+  if ( [pcolor] of patch cur_xcor cur_ycor = yellow)
+  [ report 100 ]
+  ]
+  [ report -10]
+
+  ;; get new position
+  ifelse move = 0
+   [ set cur_ycor (cur_ycor - 1 )
+      if cur_ycor = -9
+      [report -15] ; hit the wall
+  ]
+  [ifelse move = 1
+    [set cur_xcor (cur_xcor + 1)
+      if cur_xcor = 9
+      [report -15] ; hit the wall
+    ]
+    [ifelse move = 2
+      [ set cur_ycor (cur_ycor + 1 )
+        if cur_ycor = 9
+        [report -15] ; hit the wall
+      ]
+        [ set cur_xcor (cur_xcor - 1)
+        if cur_xcor = -9
+        [report -15] ; hit the wall
+         ]]]
 
 
+  ;did it fall into a pit
+   if ( [pcolor] of patch cur_xcor cur_ycor = brown)
+  [ report -250 ]
+
+  ;did it sense a breeze
+     if ( [pcolor] of patch cur_xcor cur_ycor = blue)
+  [ report -5]
+
+  ; did it exit with a gold
+  if ( [pcolor] of patch cur_xcor cur_ycor = red ) and ([has_Gold] of turtle currentTurtle = 1)
+  [ report 1000]
+
+
+  ;; case when hitting another agent
+
+  report -1
+end
+
+to update-Q-learning [move x y]
+  ;; reward before the move
+   let q_val (get-Q-value x y move)
+   let cur_reward ( [reward] of turtle currentTurtle)
+   let cur_error  ( cur_reward + (discount_factor * ( max_q_val x y move )) - q_val )
+
+   let new_q_val ( q_val + (learning_rate * cur_error))
+   set-agent-Q-value x y move new_q_val
+
+
+end
+
+to update-SARSA [move x y]
+  let q_val (get-Q-value x y move)
+  let cur_reward ( [reward] of turtle currentTurtle)
+  let new_move (get-next-move x y move )
+
+  let cur_error ( cur_reward + (discount_factor * get-next-q-value x y move new_move) - q_val )
+
+     let new_q_val ( q_val + (learning_rate * cur_error))
+   set-agent-Q-value x y move new_q_val
+
+
+end
 
 
 
@@ -368,9 +555,9 @@ ticks
 
 BUTTON
 14
-26
+20
 78
-59
+53
 Setup
 setup
 NIL
@@ -384,10 +571,10 @@ NIL
 1
 
 BUTTON
-85
-164
-148
-197
+278
+273
+341
+306
 Right
 go-right
 NIL
@@ -401,10 +588,10 @@ NIL
 1
 
 BUTTON
-17
-165
-80
-198
+213
+273
+276
+306
 left
 go-left
 NIL
@@ -418,10 +605,10 @@ NIL
 1
 
 BUTTON
-48
-128
-111
-161
+212
+238
+275
+271
 Up
 go-up
 NIL
@@ -435,10 +622,10 @@ NIL
 1
 
 BUTTON
-46
-199
-109
-232
+277
+238
+340
+271
 Down
 go-down\n
 NIL
@@ -452,10 +639,10 @@ NIL
 1
 
 BUTTON
-84
-26
-147
-59
+80
+20
+143
+53
 go
 go
 T
@@ -469,10 +656,10 @@ NIL
 1
 
 BUTTON
-115
-128
-178
-161
+343
+240
+406
+273
 Grab
 go-grab
 NIL
@@ -486,10 +673,10 @@ NIL
 1
 
 SLIDER
-447
-10
-619
-43
+14
+65
+186
+98
 pit_count
 pit_count
 0
@@ -501,10 +688,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-446
-45
-618
-78
+14
+100
+186
+133
 max_epoch
 max_epoch
 0
@@ -516,14 +703,54 @@ NIL
 HORIZONTAL
 
 CHOOSER
-453
-93
-591
-138
+14
+206
+152
+251
 move_algo
 move_algo
 "Greedy" "Soft"
 0
+
+CHOOSER
+14
+253
+152
+298
+reward_algo
+reward_algo
+"Q learning" "SARSA"
+0
+
+SLIDER
+14
+170
+186
+203
+learning_rate
+learning_rate
+0
+1
+0.7
+0.1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+14
+135
+186
+168
+discount_factor
+discount_factor
+0
+1
+0.85
+0.01
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
