@@ -1,12 +1,12 @@
 ;;; Variable we will use
 
 
-globals [ gold_x gold_y gold_count has_gold gridSize]
+globals [ gold_x gold_y gold_count gridSize currentTurtle bExit]
 
 
 ;;; Entitities
 ;;breed   [ pits pit]
-
+breed [players player]
 ;;;
 
 ;;; Extentions
@@ -15,23 +15,57 @@ extensions [array]
 
 ;;;
 
+players-own [ init_xcor init_ycor has_gold is_cool]
 ;pits-own [ init_xcor init_ycor ]
 
 
 ;;; Setting up.
 to setup
   clear-all
-  ;; create-agents
+  summon-players
   summon-pits
   summon-gold
+  summon-exits
   set gridSize 8
-  set has_gold 0
-  create-turtles 1 [ setxy 8 8 ]
+  set currentTurtle 0
+ ; set has_gold 0
+ ; create-turtles 1 [ setxy 8 8 ]
   reset-ticks
 end
 
 
+;; Summonings
 
+to summon-players
+    create-players 1
+  [
+   set init_xcor 8
+   set init_ycor 8
+   set has_gold 0
+    setxy init_xcor init_ycor
+  ]
+      create-players 1
+  [
+   set init_xcor -8
+   set init_ycor -8
+   set has_gold 0
+    setxy init_xcor init_ycor
+  ]
+      create-players 1
+  [
+   set init_xcor 8
+   set init_ycor -8
+   set has_gold 0
+    setxy init_xcor init_ycor
+  ]
+      create-players 1
+  [
+   set init_xcor -8
+   set init_ycor  8
+   set has_gold 0
+    setxy init_xcor init_ycor
+  ]
+end
 
 ;; Movement function
 
@@ -66,45 +100,61 @@ end
 
 
 to go
+  if can-exit = 0 [stop]
   ifelse any? turtles
   [
-  go-random
-  tick
+  agent-loop
   ]
-  [stop]
+  [ stop ]
 
+
+  tick
+end
+
+
+to agent-loop
+  let cnt 0
+  set currentTurtle 0
+  while [ currentTurtle != 4]
+  [
+    if is-turtle? turtle currentTurtle
+    [
+    go-random
+    set currentTurtle currentTurtle + 1
+    print currentTurtle
+    ]
+  ]
 end
 
 to go-random
     let move random 5
   ifelse move = 0;-gridSize
-  [ask turtles [go-down]]
-
+  [ask turtle currentTurtle [go-down]]
   [ifelse move = 1
-    [ask turtles [go-right]]
-
+    [ask turtle currentTurtle [go-right]]
     [ifelse move = 2
-      [ask turtles [go-up]]
-
+      [ask turtle currentTurtle [go-up]]
       [ifelse move = 3
-        [ask turtles [go-left]]
-        [ask turtles [go-grab]]]]]
+        [ask turtle currentTurtle [go-left]]
+        [ask turtle currentTurtle [go-grab]]]]]
 end
 
 
 to go-down
   let new-ycor 0
   if( ycor - 1 != -9)
-  [set new-ycor ycor - 1]
-  ask turtle 0 [ setxy xcor new-ycor]
+  [set new-ycor ycor - 1
+  ask turtle currentTurtle [ setxy xcor new-ycor]
+  ]
   pit-fall
 end
 
 to go-up
   let new-ycor 0
     if( ycor + 1 != 9)
-  [set new-ycor ycor + 1]
-  ask turtle 0 [ setxy xcor  new-ycor]
+  [set new-ycor ycor + 1
+  ask turtle currentTurtle [ setxy xcor  new-ycor]
+  ]
   pit-fall
 end
 
@@ -112,16 +162,18 @@ end
 to go-left
   let new-xcor 0
     if( xcor - 1 != -9)
-  [set new-xcor xcor - 1]
-  ask turtle 0 [ setxy new-xcor ycor ]
+  [set new-xcor xcor - 1
+  ask turtle currentTurtle [ setxy new-xcor ycor ]
+  ]
   pit-fall
 end
 
 to go-right
   let new-xcor 0
    if( xcor + 1 != 9)
-  [set new-xcor xcor + 1]
-  ask turtle 0 [ setxy new-xcor ycor]
+  [set new-xcor xcor + 1
+  ask turtle currentTurtle [ setxy new-xcor ycor]
+  ]
   pit-fall
 end
 
@@ -130,6 +182,7 @@ to go-grab
  [ if ycor = gold_y
     [
       ask patch gold_x gold_y [set pcolor black]
+      ask turtle currentTurtle [ set has_gold 1 ]
     ]]
   [
    print gold_x
@@ -172,11 +225,28 @@ to summon-gold
 
 end
 
+to summon-exits
+
+  ask patch 8 8 [ set pcolor red]
+
+end
+
 ;;;; Environment functions.
 
 to pit-fall
       if ( [pcolor] of patch xcor ycor = brown)
   [ask turtle 0 [ die ]]
+end
+
+to-report can-exit
+  ask turtles with [ has_gold = 1 ]
+ [      if ( [pcolor] of patch xcor ycor = red)
+    [ set bExit 1 ] ]
+
+  if bExit = 1
+    [ report 0]
+  report 1
+
 end
 
 
@@ -684,7 +754,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.3
+NetLogo 6.0.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
