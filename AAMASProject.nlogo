@@ -1,7 +1,7 @@
 ;;; Variable we will use
 
 
-globals [num_actions gold_x gold_y gold_count gridSize currentTurtle bExit]
+globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon]
 
 
 ;;; Entitities
@@ -15,20 +15,18 @@ extensions [array]
 
 ;;;
 
-players-own [ init_xcor init_ycor has_gold is_cool Q-values]
+players-own [ init_xcor init_ycor has_gold is_cool Q_values iamTurtle]
 ;pits-own [ init_xcor init_ycor ]
 
 
 ;;; Setting up.
 to setup
   clear-all
+  init-globals
   summon-players
   summon-pits
   summon-gold
   summon-exits
-  set gridSize 8
-  set currentTurtle 0
-  set num_actions 5
  ; set has_gold 0
  ; create-turtles 1 [ setxy 8 8 ]
   reset-ticks
@@ -37,13 +35,21 @@ end
 
 ;; Summonings
 
+to init-globals
+  set gridSize 8
+  set currentTurtle 0
+  set num_moves 5
+  set epoch 0
+  set epsilon 0.9
+end
+
 to summon-players
     create-players 1
   [
    set init_xcor 8
    set init_ycor 8
    set has_gold 0
-    set Q-values init-Q-values
+    set Q_values init-Q-values
     setxy init_xcor init_ycor
   ]
       create-players 1
@@ -51,7 +57,7 @@ to summon-players
    set init_xcor -8
    set init_ycor -8
    set has_gold 0
-    set Q-values init-Q-values
+    set Q_values init-Q-values
     setxy init_xcor init_ycor
   ]
       create-players 1
@@ -59,7 +65,7 @@ to summon-players
    set init_xcor 8
    set init_ycor -8
    set has_gold 0
-    set Q-values init-Q-values
+    set Q_values init-Q-values
     setxy init_xcor init_ycor
   ]
       create-players 1
@@ -67,7 +73,7 @@ to summon-players
    set init_xcor -8
    set init_ycor  8
    set has_gold 0
-   set Q-values init-Q-values
+   set Q_values init-Q-values
     setxy init_xcor init_ycor
   ]
 end
@@ -103,17 +109,37 @@ to add-breeze
   ] ]]
 end
 
+;; to go
+;; ifelse epoch-finished? [
+;  reset
+;  if epoch >= max_epochs [stop]
+;]
+;[
+; agent-loop
+; set time_steps (time_steps + 1)
+; ]
+; end
+
+to reset
+  ask players [
+
+   set xcor init_xcor
+   set ycor init_ycor
+   set has_gold 0
+  ]
+   ;; new pits ?
+   set epoch (epoch + 1)
+   set time_steps 0
+end
+
 
 to go
   if can-exit = 0 [stop]
   ifelse any? turtles
   [
   agent-loop
-  ;;go-random
   ]
   [ stop ]
-
-
   tick
 end
 
@@ -121,12 +147,16 @@ end
 to agent-loop
   let cnt 0
   set currentTurtle 0
+  ;; let  a [xcor] of turtle currentTurtle
   while [ currentTurtle != 4]
   [
     if is-turtle? turtle currentTurtle
     [
-      print currentTurtle
-    go-random
+   ; go-random
+      let cur_xcor ([xcor] of turtle currentTurtle) + 8
+      let cur_ycor ([ycor] of turtle currentTurtle) + 8
+
+      go-next next-move cur_xcor cur_ycor
     ]
     set currentTurtle currentTurtle + 1
   ;;  print currentTurtle
@@ -134,8 +164,7 @@ to agent-loop
   ]
 end
 
-to go-random
-    let move random 5
+to go-next [ move ]
   ifelse move = 0;-gridSize
   [ask turtle currentTurtle [go-down]]
   [ifelse move = 1
@@ -145,6 +174,12 @@ to go-random
       [ifelse move = 3
         [ask turtle currentTurtle [go-left]]
         [ask turtle currentTurtle [go-grab]]]]]
+end
+
+
+to go-random
+    let move random 5
+    go-next move
 end
 
 
@@ -193,9 +228,9 @@ to go-grab
       ask turtle currentTurtle [ set has_gold 1 ]
     ]]
   [
-   print gold_x
-    print xcor
-     print ycor
+  ; print gold_x
+  ;  print xcor
+   ;  print ycor
   ]
 end
 
@@ -240,9 +275,14 @@ to summon-exits
 end
 
 to-report init-Q-values
-  report array:from-list n-values world-width [
-    array:from-list n-values world-height [
-      array:from-list n-values num_actions [0] ]]
+  report array:from-list n-values ( world-width  )  [
+    array:from-list n-values ( world-height ) [
+      array:from-list n-values num_moves [0] ]]
+end
+
+to-report get-Q-values [x y]
+ ;  print array:item (array:item (array:item ( [Q_values] of turtle currentTurtle ) x) y ) 0
+  report array:item (array:item ( [Q_values] of turtle currentTurtle ) x) y
 end
 
 
@@ -263,6 +303,41 @@ to-report can-exit
   report 1
 
 end
+
+;;; Reinforcement Learning
+
+to-report next-move [x y]
+  ifelse move_algo = "Greedy"
+     [report new-move-e-greedy x y]
+  []
+end
+
+to-report new-move-e-greedy [ x y]
+   let rand random-float 1
+  ; print rand
+   ifelse rand < epsilon
+   [
+    report random num_moves
+   ]
+  [
+  ;  print x
+  ;  print y
+    let move_values array:to-list (get-Q-values x y)
+   report ( position (max move_values) move_values )
+
+  ]
+
+end
+
+
+
+
+
+
+
+
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -424,6 +499,31 @@ pit_count
 1
 NIL
 HORIZONTAL
+
+SLIDER
+446
+45
+618
+78
+max_epoch
+max_epoch
+0
+100
+1.0
+1
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+453
+93
+591
+138
+move_algo
+move_algo
+"Greedy" "Soft"
+0
 
 @#$#@#$#@
 ## WHAT IS IT?
