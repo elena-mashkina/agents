@@ -143,6 +143,7 @@ to reset
    ;; new pits ?
    set epoch (epoch + 1)
    set time_steps 0
+   set bExit 0
   ask patch gold_x gold_y [set pcolor yellow]
 end
 
@@ -609,7 +610,6 @@ end
 
 
 
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -805,7 +805,7 @@ CHOOSER
 reward_algo
 reward_algo
 "Q learning" "SARSA"
-0
+1
 
 SLIDER
 14
