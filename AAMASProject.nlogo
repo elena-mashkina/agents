@@ -1,8 +1,6 @@
 ;;; Variable we will use
 
-
-globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon temperature]
-
+globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon temperature visited_map color_map]
 
 ;;; Entitities
 ;;breed   [ pits pit]
@@ -13,11 +11,7 @@ breed [players player]
 extensions [array]
 ;;;
 
-;;;
-
-players-own [ init_xcor init_ycor has_gold is_cool Q_values iamTurtle reward total_reward]
-;pits-own [ init_xcor init_ycor ]
-
+players-own [ init_xcor init_ycor has_gold is_cool Q_values reward total_reward]
 
 ;;; Setting up.
 to setup
@@ -42,6 +36,8 @@ to init-globals
   set epoch 0
   set epsilon 0.9
   set temperature 100
+  set color_map init-color-map
+  set visited_map init-visited-map
 end
 
 to summon-players
@@ -161,6 +157,7 @@ end
 
 to agent-loop
   set currentTurtle 0
+  ;;count-reward
   ;; loops through all agents
   while [ currentTurtle != 4]
   [
@@ -354,17 +351,37 @@ to-report init-Q-values
       array:from-list n-values num_moves [0] ]]
 end
 
+
 to-report get-time-steps
   report time_steps
 end
 
 to-report get-Q-values [x y]
 
+
+to-report init-visited-map
+  report array:from-list n-values world-width [ array:from-list n-values world-height [0] ]
+end
+
+
+to-report init-color-map
+  report array:from-list n-values world-width [array:from-list n-values world-height ["none"] ]
+end
+
+to-report get-Q-values [x y]
   report array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8))( y + 8)
 end
 
 to-report get-Q-value [x y move]
   report array:item ( array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8)) (y + 8) ) move
+end
+
+to-report get-value-2d [x y matrix]
+  report array:item (array:item matrix (x + 8))(y + 8)
+end
+
+to set-value-2d [x y matrix value]
+   array:set (array:item matrix (x + 8)) (y + 8) value
 end
 
 ;; sets the value for the current agent
@@ -478,6 +495,28 @@ to-report next-move [x y]
      [report new-move-reactive x y]]
 end
 
+
+to-report new-move-soft [ x y]
+end
+
+to-report new-move-reactive [x y]
+  update-maps x y
+  report 0
+end
+
+
+to update-maps [x y]
+  let cur_value get-value-2d x y visited_map
+  let patch_color [pcolor] of patch x y
+
+  if (cur_value = 0 and patch_color = black)
+  [
+     set-value-2d x y visited_map 1
+     set-value-2d x y color_map black
+  ]
+end
+
+
 to update-Q-value [ move x y]
   ifelse reward_algo = "Q learning"
   [ update-Q-learning move x y]
@@ -514,18 +553,15 @@ end
 
 to-report new-move-e-greedy [ x y]
    let rand random-float 1
-  ; print rand
    ifelse rand < epsilon
    [
     report random num_moves
    ]
-  [
-  ;  print x
-  ;  print y
-    let move_values array:to-list (get-Q-values x y)
-   report ( position (max move_values) move_values )
 
-  ]
+   [
+    let move_values array:to-list (get-Q-values x y)
+    report ( position (max move_values) move_values )
+   ]
 
 end
 
@@ -605,9 +641,6 @@ to update-SARSA [move x y]
 
 
 end
-
-
-
 
 
 @#$#@#$#@
@@ -766,7 +799,7 @@ pit_count
 pit_count
 0
 10
-5.0
+3.0
 1
 1
 NIL
@@ -781,7 +814,11 @@ max_epochs
 max_epochs
 0
 100
+
 99.0
+
+0.0
+
 1
 1
 NIL
@@ -794,8 +831,12 @@ CHOOSER
 251
 move_algo
 move_algo
+
 "Greedy" "Soft"
-1
+
+"Greedy" "Soft" "Reactive"
+2
+
 
 CHOOSER
 14
@@ -816,7 +857,7 @@ learning_rate
 learning_rate
 0
 1
-0.7
+0.0
 0.1
 1
 NIL
@@ -831,7 +872,7 @@ discount_factor
 discount_factor
 0
 1
-0.85
+0.0
 0.01
 1
 NIL
@@ -1190,7 +1231,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.3
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
