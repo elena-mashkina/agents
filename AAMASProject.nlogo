@@ -1,8 +1,6 @@
 ;;; Variable we will use
 
-
-globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map color_map]
-
+globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon temperature visited_map color_map]
 
 ;;; Entitities
 ;;breed   [ pits pit]
@@ -13,10 +11,7 @@ breed [players player]
 extensions [array]
 ;;;
 
-;;;
-
 players-own [ init_xcor init_ycor has_gold is_cool Q_values reward total_reward]
-;pits-own [ init_xcor init_ycor ]
 
 ;;; Setting up.
 to setup
@@ -40,6 +35,7 @@ to init-globals
   set num_moves 5
   set epoch 0
   set epsilon 0.9
+  set temperature 100
   set color_map init-color-map
   set visited_map init-visited-map
 end
@@ -119,16 +115,17 @@ to add-breeze
   ] ]]
 end
 
-;; to go
-;; ifelse epoch-finished? [
-;  reset
-;  if epoch >= max_epochs [stop]
-;]
-;[
-; agent-loop
-; set time_steps (time_steps + 1)
-; ]
-; end
+ to go
+  ifelse ( can-exit = 0 ) or ( not any? turtles with [hidden? = false ]) [
+  reset
+  if epoch >= max_epochs [stop]
+ ]
+[
+ agent-loop
+ set time_steps (time_steps + 1)
+]
+  tick
+end
 
 to reset
   ask players [
@@ -137,22 +134,25 @@ to reset
    set ycor init_ycor
    set has_gold 0
    set total_reward 0
+   set hidden? false
   ]
    ;; new pits ?
    set epoch (epoch + 1)
    set time_steps 0
+   set bExit 0
+  ask patch gold_x gold_y [set pcolor yellow]
 end
 
 
-to go
-  if can-exit = 0 [stop]
-  ifelse any? turtles
-  [
-  agent-loop
-  ]
-  [ stop ]
-  tick
-end
+;to go
+;  if can-exit = 0 [stop]
+;  ifelse any? turtles
+;  [
+;  agent-loop
+;  ]
+;  [ stop ]
+;  tick
+;end
 
 
 to agent-loop
@@ -161,7 +161,7 @@ to agent-loop
   ;; loops through all agents
   while [ currentTurtle != 4]
   [
-    if is-turtle? turtle currentTurtle
+    if ( [hidden?] of turtle currentTurtle ) != true
     [
       ; go-random ; <<< naive agent
       let cur_xcor ([xcor] of turtle currentTurtle)
@@ -175,6 +175,7 @@ to agent-loop
       ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
 
       ;; Updates the environment
+      print cur_move
       update-Q-value cur_move cur_xcor cur_ycor
       go-next cur_move
 
@@ -251,9 +252,56 @@ to go-grab
       ask turtle currentTurtle [ set has_gold 1 ]
     ]]
   [
-  ; print gold_x
-  ;  print xcor
-   ;  print ycor
+  ]
+end
+
+;; Manually Controlled
+
+to turtle-go-down
+  let new-ycor ([ycor] of turtle 0)
+  if( new-ycor - 1 != -9)
+  [set new-ycor new-ycor - 1
+    ask turtle 0 [ set ycor new-ycor]
+  ]
+  pit-fall
+end
+
+to turtle-go-up
+    let new-ycor ([ycor] of turtle 0)
+    if( new-ycor + 1 != 9)
+  [set new-ycor new-ycor + 1
+     ask turtle 0 [ set ycor new-ycor]
+  ]
+  pit-fall
+end
+
+
+to turtle-go-left
+  let new-xcor ([xcor] of turtle 0)
+  if( new-xcor - 1 != -9)
+  [set new-xcor new-xcor - 1
+    ask turtle 0 [ set xcor new-xcor]
+  ]
+  pit-fall
+end
+
+to turtle-go-right
+   let new-xcor ([xcor] of turtle 0)
+  if( new-xcor + 1 != 9)
+  [set new-xcor new-xcor + 1
+    ask turtle 0 [ set xcor new-xcor]
+  ]
+  pit-fall
+end
+
+to turtle-go-grab
+  ifelse ([xcor] of turtle 0) = gold_x
+ [ if ([ycor] of turtle 0) = gold_y
+    [
+      ask patch gold_x gold_y [set pcolor black]
+      ask turtle 0 [ set has_gold 1 ]
+    ]]
+  [
   ]
 end
 
@@ -304,6 +352,13 @@ to-report init-Q-values
 end
 
 
+to-report get-time-steps
+  report time_steps
+end
+
+to-report get-Q-values [x y]
+
+
 to-report init-visited-map
   report array:from-list n-values world-width [ array:from-list n-values world-height [0] ]
 end
@@ -339,9 +394,10 @@ end
 
 to pit-fall
       if ( [pcolor] of patch xcor ycor = brown)
-  [ask turtle currentTurtle [ die ]]
+  [ask turtle currentTurtle [ set hidden? true ]]
 end
 
+;; Does this work before adding the reward ??
 to-report can-exit
   ask turtles with [ has_gold = 1 ]
  [      if ( [pcolor] of patch xcor ycor = red)
@@ -448,28 +504,6 @@ to-report new-move-reactive [x y]
   report 0
 end
 
-to update-color-map [x y]
-
-  if ([pcolor] of patch x y = red)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "red"
-  ]
-
-  if ([pcolor] of patch x y  = yellow)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "yellow"
-  ]
-
-  if ([pcolor] of patch x y  = black)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "black"
-  ]
-
-  if ([pcolor] of patch x y  = blue)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "blue"
-  ]
-end
 
 to update-maps [x y]
   let cur_value get-value-2d x y visited_map
@@ -480,8 +514,6 @@ to update-maps [x y]
      set-value-2d x y visited_map 1
      set-value-2d x y color_map black
   ]
-
-
 end
 
 
@@ -491,6 +523,33 @@ to update-Q-value [ move x y]
   [ update-SARSA move x y]
 
 end
+
+
+
+to-report new-move-soft [ x y]
+   let moves array:to-list ( get-Q-values x y)
+  let probs map [ [?1] -> (exp (?1 / temperature)) ] moves
+  let sum_q sum probs
+  set probs map [ [?1] -> ?1 / sum_q] probs
+
+  let rand random-float 1
+  let probs_sum item 0 probs
+  let action_index 0
+  while [ (probs_sum < rand ) and (action_index != 5 )]
+  [
+   set action_index ( action_index + 1)
+   set probs_sum (probs_sum + (item action_index probs))
+  ]
+  print moves
+  report item action_index [ 0 1 2 3 4 ]
+
+
+end
+
+to-report new-move-reactive [x y]
+   report 0;
+end
+
 
 to-report new-move-e-greedy [ x y]
    let rand random-float 1
@@ -635,7 +694,7 @@ BUTTON
 341
 306
 Right
-go-right
+turtle-go-right
 NIL
 1
 T
@@ -652,7 +711,7 @@ BUTTON
 276
 306
 left
-go-left
+turtle-go-left
 NIL
 1
 T
@@ -669,7 +728,7 @@ BUTTON
 275
 271
 Up
-go-up
+turtle-go-up
 NIL
 1
 T
@@ -686,7 +745,7 @@ BUTTON
 340
 271
 Down
-go-down\n
+turtle-go-down\n
 NIL
 1
 T
@@ -720,7 +779,7 @@ BUTTON
 406
 273
 Grab
-go-grab
+turtle-go-grab
 NIL
 1
 T
@@ -751,11 +810,15 @@ SLIDER
 100
 186
 133
-max_epoch
-max_epoch
+max_epochs
+max_epochs
 0
 100
+
+99.0
+
 0.0
+
 1
 1
 NIL
@@ -768,8 +831,12 @@ CHOOSER
 251
 move_algo
 move_algo
+
+"Greedy" "Soft"
+
 "Greedy" "Soft" "Reactive"
 2
+
 
 CHOOSER
 14
@@ -779,7 +846,7 @@ CHOOSER
 reward_algo
 reward_algo
 "Q learning" "SARSA"
-0
+1
 
 SLIDER
 14
@@ -810,6 +877,17 @@ discount_factor
 1
 NIL
 HORIZONTAL
+
+MONITOR
+476
+36
+547
+81
+time-steps
+get-time-steps
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
