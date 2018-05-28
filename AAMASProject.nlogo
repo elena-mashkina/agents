@@ -31,7 +31,6 @@ to setup
   reset-ticks
 end
 
-
 ;; Summonings
 
 to init-globals
@@ -143,7 +142,6 @@ to reset
    set time_steps 0
 end
 
-
 to go
   if can-exit = 0 [stop]
   ifelse any? turtles
@@ -153,7 +151,6 @@ to go
   [ stop ]
   tick
 end
-
 
 to agent-loop
   set currentTurtle 0
@@ -171,11 +168,11 @@ to agent-loop
       let cur_move next-move cur_xcor cur_ycor
      ; let cur_reward (get-Q-value cur_xcor cur_ycor cur_move)
       ; gets the reward from the upcoming move
-      ask turtle currentTurtle [set reward get-reward cur_move ]
-      ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
+      ;ask turtle currentTurtle [set reward get-reward cur_move ]
+      ;ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
 
       ;; Updates the environment
-      update-Q-value cur_move cur_xcor cur_ycor
+      ;update-Q-value cur_move cur_xcor cur_ycor
       go-next cur_move
 
 
@@ -188,7 +185,7 @@ to agent-loop
 end
 
 to go-next [ move ]
-  ifelse move = 0;-gridSize
+  ifelse move = 0
   [ask turtle currentTurtle [go-down]]
   [ifelse move = 1
     [ask turtle currentTurtle [go-right]]
@@ -199,12 +196,10 @@ to go-next [ move ]
         [ask turtle currentTurtle [go-grab]]]]]
 end
 
-
 to go-random
     let move random 5
     go-next move
 end
-
 
 to go-down
   let new-ycor 0
@@ -223,7 +218,6 @@ to go-up
   ]
   pit-fall
 end
-
 
 to go-left
   let new-xcor 0
@@ -322,11 +316,23 @@ to-report get-Q-value [x y move]
 end
 
 to-report get-value-2d [x y matrix]
-  report array:item (array:item matrix (x + 8))(y + 8)
+  let x_idx (coord-to-idx x)
+  let y_idx (coord-to-idx y)
+  ifelse ((valid-idx x_idx) and (valid-idx y_idx))
+  [
+  report array:item (array:item matrix x_idx) y_idx
+  ]
+  [carefully [print ("a wall!")] [ print error-message ] report -100]
 end
 
 to set-value-2d [x y matrix value]
-   array:set (array:item matrix (x + 8)) (y + 8) value
+  let x_idx (coord-to-idx x)
+  let y_idx (coord-to-idx y)
+  ifelse ((valid-idx x_idx) and (valid-idx y_idx))
+  [
+   array:set (array:item matrix x_idx) y_idx value
+  ]
+  [carefully [ print ("a wall!") ] [ print error-message ]]
 end
 
 ;; sets the value for the current agent
@@ -445,45 +451,107 @@ end
 
 to-report new-move-reactive [x y]
   update-maps x y
-  report 0
-end
-
-to update-color-map [x y]
-
-  if ([pcolor] of patch x y = red)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "red"
-  ]
-
-  if ([pcolor] of patch x y  = yellow)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "yellow"
-  ]
-
-  if ([pcolor] of patch x y  = black)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "black"
-  ]
-
-  if ([pcolor] of patch x y  = blue)
-  [
-   array:set (array:item color_map (x + 8))( y + 8) "blue"
-  ]
+  report random num_moves
 end
 
 to update-maps [x y]
-  let cur_value get-value-2d x y visited_map
   let patch_color [pcolor] of patch x y
+  let cur_value get-value-2d x y visited_map
 
-  if (cur_value = 0 and patch_color = black)
+  set-value-2d x y visited_map 1
+  set-value-2d x y color_map patch_color
+
+  update-neighbor x y patch_color cur_value
+
+end
+
+to-report coord-to-idx [coord]
+  let offset ((world-width + 1) / 2)
+  report (coord + offset)
+end
+
+to-report idx-to-coord [idx]
+  let offset ((world-width + 1) / 2)
+  report (idx - offset)
+end
+
+to-report valid-idx [idx]
+  ifelse (idx > 0 and idx < world-width)
+  [report true]
+  [report false]
+end
+
+to update-neighbor [x y col cur_val]
+  let x_idx  (coord-to-idx x)
+  let y_idx  (coord-to-idx y)
+
+
+  if (col = black or col = red)
   [
-     set-value-2d x y visited_map 1
-     set-value-2d x y color_map black
+    set-value-2d x_idx y_idx visited_map 1
+    ask patch x y [set pcolor magenta]
+
+    if (valid-idx (y_idx + 1))
+    [
+      ;getting the value of the upper cell
+      let up_val (get-value-2d x_idx (y_idx + 1) visited_map)
+      if (up_val != 1)
+      [set-value-2d x_idx (y_idx + 1) visited_map 1]
+
+      ask patch (idx-to-coord x_idx) (idx-to-coord (y_idx + 1)) [set pcolor magenta]
+
+    ]
+
+    if (valid-idx (y_idx - 1))
+    [
+      ;getting the value of the lower cell
+      let down_val (get-value-2d x_idx (y_idx - 1) visited_map)
+      if (down_val != 1)
+      [set-value-2d x_idx (y_idx - 1) visited_map 1]
+
+      ask patch (idx-to-coord x_idx) (idx-to-coord (y_idx - 1)) [set pcolor magenta]
+    ]
+
+    if (valid-idx (x_idx + 1))
+    [
+      ;getting the value of the cell to the right
+      let right_val (get-value-2d (x_idx + 1) y_idx visited_map)
+      if (right_val != 1)
+      [set-value-2d (x_idx + 1) y_idx visited_map 1]
+
+      ask patch (idx-to-coord (x_idx + 1)) (idx-to-coord y_idx) [set pcolor magenta]
+    ]
+
+    if (valid-idx (x_idx - 1))
+    [
+      ;getting the value of the cell to the left
+      let left_val (get-value-2d (x_idx - 1) y_idx visited_map)
+      if (left_val != 1)
+      [set-value-2d (x_idx - 1) y_idx visited_map 1]
+
+      ask patch (idx-to-coord (x_idx - 1)) (idx-to-coord y_idx) [set pcolor magenta]
+    ]
   ]
+
+  if (col = cyan)
+  [
+
+  ]
+
+  print-matrix visited_map
 
 
 end
 
+to print-matrix [matrix]
+  let i 0
+
+  while [i != world-width]
+  [print (array:item matrix i)
+    set i (i + 1)
+  ]
+  print ("========================")
+end
 
 to update-Q-value [ move x y]
   ifelse reward_algo = "Q learning"
@@ -582,8 +650,6 @@ to update-SARSA [move x y]
 
 
 end
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -740,7 +806,7 @@ pit_count
 pit_count
 0
 10
-3.0
+5.0
 1
 1
 NIL
