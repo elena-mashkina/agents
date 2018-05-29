@@ -1,7 +1,7 @@
 ;;; Variable we will use
 
 
-globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map color_map]
+globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map color_map offset]
 
 
 ;;; Entitities
@@ -35,6 +35,7 @@ end
 
 to init-globals
   set gridSize 8
+  set offset ((world-width - 1) / 2)
   set currentTurtle 0
   set num_moves 5
   set epoch 0
@@ -322,7 +323,7 @@ to-report get-value-2d [x y matrix]
   [
   report array:item (array:item matrix x_idx) y_idx
   ]
-  [carefully [print ("a wall!")] [ print error-message ] report -100]
+  [carefully [print (word "error getting val of " x y)] [ print error-message ] report -100]
 end
 
 to set-value-2d [x y matrix value]
@@ -332,7 +333,7 @@ to set-value-2d [x y matrix value]
   [
    array:set (array:item matrix x_idx) y_idx value
   ]
-  [carefully [ print ("a wall!") ] [ print error-message ]]
+  [carefully [ print (word "error setting a val of " x y) ] [ print error-message ]]
 end
 
 ;; sets the value for the current agent
@@ -456,80 +457,73 @@ end
 
 to update-maps [x y]
   let patch_color [pcolor] of patch x y
-  let cur_value get-value-2d x y visited_map
-
-  set-value-2d x y visited_map 1
-  set-value-2d x y color_map patch_color
-
-  update-neighbor x y patch_color cur_value
+  update-neighbor x y patch_color
 
 end
 
 to-report coord-to-idx [coord]
-  let offset ((world-width + 1) / 2)
   report (coord + offset)
 end
 
 to-report idx-to-coord [idx]
-  let offset ((world-width + 1) / 2)
   report (idx - offset)
 end
 
 to-report valid-idx [idx]
-  ifelse (idx > 0 and idx < world-width)
+  ifelse (idx >= 0 and idx < world-width)
   [report true]
   [report false]
 end
 
-to update-neighbor [x y col cur_val]
-  let x_idx  (coord-to-idx x)
-  let y_idx  (coord-to-idx y)
-
+to update-neighbor [x y col]
+;  print (".............")
+;  let map_value get-value-2d x y visited_map
+;  print (word "x " x " y " y " value " map_value)
+;  print (".............")
 
   if (col = black or col = red)
   [
-    set-value-2d x_idx y_idx visited_map 1
-    ask patch x y [set pcolor magenta]
+    set-value-2d x y visited_map 1
+    ask patch x y [set pcolor grey]
 
-    if (valid-idx (y_idx + 1))
+    if ( y != offset) ; if x y cell is not on the upper world border
     [
       ;getting the value of the upper cell
-      let up_val (get-value-2d x_idx (y_idx + 1) visited_map)
+      let up_val (get-value-2d x (y + 1) visited_map)
       if (up_val != 1)
-      [set-value-2d x_idx (y_idx + 1) visited_map 1]
+      [set-value-2d x (y + 1) visited_map 1]
 
-      ask patch (idx-to-coord x_idx) (idx-to-coord (y_idx + 1)) [set pcolor magenta]
-
+      ask patch x (y + 1) [set pcolor grey]
     ]
 
-    if (valid-idx (y_idx - 1))
+    if ( y != (- offset))  ; if x y cell is not on an the lower world border
     [
       ;getting the value of the lower cell
-      let down_val (get-value-2d x_idx (y_idx - 1) visited_map)
+      let down_val (get-value-2d x (y - 1) visited_map)
       if (down_val != 1)
-      [set-value-2d x_idx (y_idx - 1) visited_map 1]
+      [set-value-2d x (y - 1) visited_map 1]
 
-      ask patch (idx-to-coord x_idx) (idx-to-coord (y_idx - 1)) [set pcolor magenta]
+      ask patch x (y - 1) [set pcolor grey]
     ]
 
-    if (valid-idx (x_idx + 1))
+    if ( x != offset) ; if x y cell is not on an the right world border
     [
       ;getting the value of the cell to the right
-      let right_val (get-value-2d (x_idx + 1) y_idx visited_map)
+      let right_val (get-value-2d (x + 1) y visited_map)
       if (right_val != 1)
-      [set-value-2d (x_idx + 1) y_idx visited_map 1]
+      [set-value-2d (x + 1) y visited_map 1]
 
-      ask patch (idx-to-coord (x_idx + 1)) (idx-to-coord y_idx) [set pcolor magenta]
+      ask patch (x + 1) y [set pcolor grey]
     ]
 
-    if (valid-idx (x_idx - 1))
+    if ( x != (- offset)) ; if x y cell is not on an the left world border
     [
       ;getting the value of the cell to the left
-      let left_val (get-value-2d (x_idx - 1) y_idx visited_map)
+      let left_val (get-value-2d (x - 1) y visited_map)
       if (left_val != 1)
-      [set-value-2d (x_idx - 1) y_idx visited_map 1]
+      [set-value-2d (x - 1) y visited_map 1]
 
-      ask patch (idx-to-coord (x_idx - 1)) (idx-to-coord y_idx) [set pcolor magenta]
+      ask patch (x - 1) y [set pcolor grey]
     ]
   ]
 
