@@ -1,5 +1,7 @@
 ;;; Variable we will use
 
+;resize-world -5 5 -5 5 !!!!!!
+
 
 globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map offset temperature]
 
@@ -25,6 +27,9 @@ to setup
   summon-exits
  ; set has_gold 0
  ; create-turtles 1 [ setxy 8 8 ]
+  set epoch (epoch + 1)
+  set time_steps 0
+  set bExit 0
   reset-ticks
 end
 
@@ -166,33 +171,40 @@ to summon-exits
 end
 
 to go
-  ifelse ( can-exit = 0 ) or ( not any? turtles with [hidden? = false ]) [
-  print ("game over")
-  reset
-  if epoch >= max_epochs [stop]
- ]
-[
- agent-loop
- set time_steps (time_steps + 1)
-]
+  ifelse ( can-exit = 0 ) or ( not any? turtles with [hidden? = false ])
+  [
+
+    ifelse (can-exit = 0)[print ("moths won!")][print("game over")]
+
+    ;reset
+    clear-turtles
+    setup
+    if epoch >= max_epochs
+    [stop]
+  ]
+
+  [
+    agent-loop
+    set time_steps (time_steps + 1)
+  ]
   tick
 end
 
-to reset
-  ask players [
-
-   set xcor init_xcor
-   set ycor init_ycor
-   set has_gold 0
-   set total_reward 0
-   set hidden? false
-  ]
-   ;; new pits ?
-   set epoch (epoch + 1)
-   set time_steps 0
-   set bExit 0
-   ask patch gold_x gold_y [set pcolor yellow]
-end
+;to reset
+;  ask players [
+;   set xcor init_xcor
+;   set ycor init_ycor
+;   set has_gold 0
+;   set total_reward 0
+;   set hidden? false
+;  ]
+;   ;; new pits ?
+;   set epoch (epoch + 1)
+;   set time_steps 0
+;   set bExit 0
+;   ask patch gold_x gold_y [set pcolor yellow]
+;   set visited_map init-visited-map
+;end
 
 ;to go
 ;  if can-exit = 0 [stop]
@@ -1052,7 +1064,7 @@ CHOOSER
 your_color
 your_color
 "white" "blue" "green" "pink"
-2
+0
 
 @#$#@#$#@
 ## WHAT IS IT?
