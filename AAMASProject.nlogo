@@ -1,7 +1,7 @@
 ;;; Variable we will use
 
 
-globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map offset]
+globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map offset temperature]
 
 
 ;;; Entitities
@@ -38,6 +38,7 @@ to init-globals
   set epoch 0
   set epsilon 0.9
   set visited_map init-visited-map
+  set temperature 100
 end
 
 to summon-players
@@ -115,16 +116,17 @@ to add-breeze
   ] ]]
 end
 
-;; to go
-;; ifelse epoch-finished? [
-;  reset
-;  if epoch >= max_epochs [stop]
-;]
-;[
-; agent-loop
-; set time_steps (time_steps + 1)
-; ]
-; end
+ to go
+  ifelse ( can-exit = 0 ) or ( not any? turtles with [hidden? = false ]) [
+  reset
+  if epoch >= max_epochs [stop]
+ ]
+[
+ agent-loop
+ set time_steps (time_steps + 1)
+]
+  tick
+end
 
 to reset
   ask players [
@@ -133,29 +135,33 @@ to reset
    set ycor init_ycor
    set has_gold 0
    set total_reward 0
+   set hidden? false
   ]
    ;; new pits ?
    set epoch (epoch + 1)
    set time_steps 0
+   set bExit 0
+   ask patch gold_x gold_y [set pcolor yellow]
 end
 
-to go
-  if can-exit = 0 [stop]
-  ifelse any? turtles
-  [
-  agent-loop
-  ]
-  [ stop ]
-  tick
-end
+
+;to go
+;  if can-exit = 0 [stop]
+;  ifelse any? turtles
+;  [
+;  agent-loop
+;  ]
+;  [ stop ]
+;  tick
+;end
+
 
 to agent-loop
   set currentTurtle 0
-  ;;count-reward
   ;; loops through all agents
   while [ currentTurtle != 4]
   [
-    if is-turtle? turtle currentTurtle
+    if ( [hidden?] of turtle currentTurtle ) != true
     [
       ; go-random ; <<< naive agent
       let cur_xcor ([xcor] of turtle currentTurtle)
@@ -165,11 +171,12 @@ to agent-loop
       let cur_move next-move cur_xcor cur_ycor
      ; let cur_reward (get-Q-value cur_xcor cur_ycor cur_move)
       ; gets the reward from the upcoming move
-      ;ask turtle currentTurtle [set reward get-reward cur_move ]
-      ;ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
+      ask turtle currentTurtle [set reward get-reward cur_move ]
+      ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
 
       ;; Updates the environment
-      ;update-Q-value cur_move cur_xcor cur_ycor
+      print cur_move
+      update-Q-value cur_move cur_xcor cur_ycor
       go-next cur_move
 
 
@@ -242,13 +249,62 @@ to go-grab
       ask turtle currentTurtle [ set has_gold 1 ]
     ]]
   [
-  ; print gold_x
-  ;  print xcor
-   ;  print ycor
   ]
 end
 
-;; Environment functions
+;; Manually Controlled
+
+to turtle-go-down
+  let new-ycor ([ycor] of turtle 0)
+  if( new-ycor - 1 != -9)
+  [set new-ycor new-ycor - 1
+    ask turtle 0 [ set ycor new-ycor]
+  ]
+  pit-fall
+end
+
+to turtle-go-up
+    let new-ycor ([ycor] of turtle 0)
+    if( new-ycor + 1 != 9)
+  [set new-ycor new-ycor + 1
+     ask turtle 0 [ set ycor new-ycor]
+  ]
+  pit-fall
+end
+
+
+to turtle-go-left
+  let new-xcor ([xcor] of turtle 0)
+  if( new-xcor - 1 != -9)
+  [set new-xcor new-xcor - 1
+    ask turtle 0 [ set xcor new-xcor]
+  ]
+  pit-fall
+end
+
+to turtle-go-right
+   let new-xcor ([xcor] of turtle 0)
+  if( new-xcor + 1 != 9)
+  [set new-xcor new-xcor + 1
+    ask turtle 0 [ set xcor new-xcor]
+  ]
+  pit-fall
+end
+
+to turtle-go-grab
+  ifelse ([xcor] of turtle 0) = gold_x
+ [ if ([ycor] of turtle 0) = gold_y
+    [
+      ask patch gold_x gold_y [set pcolor black]
+      ask turtle 0 [ set has_gold 1 ]
+    ]]
+  [
+  ]
+end
+
+
+
+;; Environment function
 
 to summon-gold
   let check  0
@@ -296,6 +352,10 @@ to-report init-visited-map
   report array:from-list n-values world-width [ array:from-list n-values world-height [0] ]
 end
 
+to-report get-time-steps
+  report time_steps
+end
+
 to-report get-Q-values [x y]
   report array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8))( y + 8)
 end
@@ -332,9 +392,10 @@ end
 
 to pit-fall
       if ( [pcolor] of patch xcor ycor = brown)
-  [ask turtle currentTurtle [ die ]]
+  [ask turtle currentTurtle [ set hidden? true ]]
 end
 
+;; Does this work before adding the reward ??
 to-report can-exit
   ask turtles with [ has_gold = 1 ]
  [      if ( [pcolor] of patch xcor ycor = red)
@@ -432,7 +493,10 @@ to-report next-move [x y]
      [report new-move-reactive x y]]
 end
 
-to-report new-move-soft [ x y]
+to update-Q-value [ move x y]
+  ifelse reward_algo = "Q learning"
+  [ update-Q-learning move x y]
+  [ update-SARSA move x y]
 end
 
 to-report new-move-reactive [x y]
@@ -446,7 +510,24 @@ to-report new-move-reactive [x y]
    [report random num_moves]
    [report position (max (get-neighbor-values x y )) (get-neighbor-values x y )] ;go in the direction of safety (safety == 1)
   ]
+end
 
+to-report new-move-soft [ x y]
+   let moves array:to-list ( get-Q-values x y)
+  let probs map [ [?1] -> (exp (?1 / temperature)) ] moves
+  let sum_q sum probs
+  set probs map [ [?1] -> ?1 / sum_q] probs
+
+  let rand random-float 1
+  let probs_sum item 0 probs
+  let action_index 0
+  while [ (probs_sum < rand ) and (action_index != 5 )]
+  [
+   set action_index ( action_index + 1)
+   set probs_sum (probs_sum + (item action_index probs))
+  ]
+  print moves
+  report item action_index [ 0 1 2 3 4 ]
 end
 
 to-report coord-to-idx [coord]
@@ -483,7 +564,7 @@ to set-cell-grey [x y]
 
   if (col = black)
   [
-    ask patch x y [set pcolor grey]
+   ask patch x y [set pcolor grey]
   ]
 
   if (col = cyan)
@@ -605,20 +686,12 @@ to print-matrix [matrix]
   print ("========================")
 end
 
-to update-Q-value [ move x y]
-  ifelse reward_algo = "Q learning"
-  [ update-Q-learning move x y]
-  [ update-SARSA move x y]
-
-end
-
 to-report new-move-e-greedy [ x y]
    let rand random-float 1
    ifelse rand < epsilon
    [
     report random num_moves
    ]
-
    [
     let move_values array:to-list (get-Q-values x y)
     report ( position (max move_values) move_values )
@@ -697,11 +770,16 @@ to update-SARSA [move x y]
 
   let cur_error ( cur_reward + (discount_factor * get-next-q-value x y move new_move) - q_val )
 
-  let new_q_val ( q_val + (learning_rate * cur_error))
-  set-agent-Q-value x y move new_q_val
+     let new_q_val ( q_val + (learning_rate * cur_error))
+   set-agent-Q-value x y move new_q_val
 
 
 end
+
+
+
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -753,7 +831,7 @@ BUTTON
 341
 306
 Right
-go-right
+turtle-go-right
 NIL
 1
 T
@@ -770,7 +848,7 @@ BUTTON
 276
 306
 left
-go-left
+turtle-go-left
 NIL
 1
 T
@@ -787,7 +865,7 @@ BUTTON
 275
 271
 Up
-go-up
+turtle-go-up
 NIL
 1
 T
@@ -804,7 +882,7 @@ BUTTON
 340
 271
 Down
-go-down\n
+turtle-go-down\n
 NIL
 1
 T
@@ -838,7 +916,7 @@ BUTTON
 406
 273
 Grab
-go-grab
+turtle-go-grab
 NIL
 1
 T
@@ -858,7 +936,7 @@ pit_count
 pit_count
 0
 10
-2.0
+5.0
 1
 1
 NIL
@@ -869,11 +947,11 @@ SLIDER
 100
 186
 133
-max_epoch
-max_epoch
+max_epochs
+max_epochs
 0
 100
-0.0
+99.0
 1
 1
 NIL
@@ -897,7 +975,7 @@ CHOOSER
 reward_algo
 reward_algo
 "Q learning" "SARSA"
-0
+1
 
 SLIDER
 14
@@ -908,7 +986,7 @@ learning_rate
 learning_rate
 0
 1
-0.0
+0.7
 0.1
 1
 NIL
@@ -923,11 +1001,22 @@ discount_factor
 discount_factor
 0
 1
-0.0
+0.85
 0.01
 1
 NIL
 HORIZONTAL
+
+MONITOR
+476
+36
+547
+81
+time-steps
+get-time-steps
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
