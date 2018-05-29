@@ -28,7 +28,7 @@ to setup
   reset-ticks
 end
 
-;; Summonings
+;; Basic setup
 
 to init-globals
   set gridSize 8
@@ -41,6 +41,16 @@ to init-globals
   set temperature 100
 end
 
+to-report init-visited-map
+  report array:from-list n-values world-width [ array:from-list n-values world-height [0] ]
+end
+
+to-report init-Q-values
+  report array:from-list n-values ( world-width  )  [
+    array:from-list n-values ( world-height ) [
+      array:from-list n-values num_moves [0] ]]
+end
+
 to summon-players
     create-players 1
   [
@@ -49,10 +59,24 @@ to summon-players
    set has_gold 0
    set reward 0
    set total_reward 0
-    set Q_values init-Q-values
-    setxy init_xcor init_ycor
+   set shape "moth_white"
+   set Q_values init-Q-values
+   setxy init_xcor init_ycor
 
   ]
+
+    create-players 1
+  [
+   set init_xcor 8
+   set init_ycor -8
+   set has_gold 0
+   set reward 0
+   set total_reward 0
+   set shape "moth_blue"
+   set Q_values init-Q-values
+   setxy init_xcor init_ycor
+  ]
+
       create-players 1
   [
    set init_xcor -8
@@ -60,19 +84,11 @@ to summon-players
    set has_gold 0
    set reward 0
    set total_reward 0
-    set Q_values init-Q-values
-    setxy init_xcor init_ycor
+   set shape "moth_green"
+   set Q_values init-Q-values
+   setxy init_xcor init_ycor
   ]
-      create-players 1
-  [
-   set init_xcor 8
-   set init_ycor -8
-   set has_gold 0
-   set reward 0
-   set total_reward 0
-    set Q_values init-Q-values
-    setxy init_xcor init_ycor
-  ]
+
       create-players 1
   [
    set init_xcor -8
@@ -80,12 +96,11 @@ to summon-players
    set has_gold 0
    set reward 0
    set total_reward 0
+   set shape "moth_lila"
    set Q_values init-Q-values
-    setxy init_xcor init_ycor
+   setxy init_xcor init_ycor
   ]
 end
-
-;; Movement function
 
 to summon-pits
   let counter 0
@@ -116,8 +131,43 @@ to add-breeze
   ] ]]
 end
 
- to go
+to summon-gold
+  let check  0
+  let some_ycor 0
+  set some_ycor random-pycor
+  let some_xcor 0
+  set some_xcor random-pxcor
+      while [abs some_ycor + abs some_xcor = 16]
+    [
+        set some_ycor random-pycor
+        set some_xcor random-pxcor
+    ]
+  if ( [pcolor] of patch some_xcor some_ycor = brown)
+  [ set check 1]
+  while [ check = 1]
+  [
+
+        set some_ycor random-pycor
+        set some_xcor random-pxcor
+    set check 0
+    if ( [pcolor] of patch some_xcor some_ycor = brown)
+    [ set check 1]
+  ]
+
+
+  set gold_x some_xcor
+  set gold_y some_ycor
+  ask patch some_xcor some_ycor [ set pcolor yellow]
+
+end
+
+to summon-exits
+  ask patch offset offset [ set pcolor red]
+end
+
+to go
   ifelse ( can-exit = 0 ) or ( not any? turtles with [hidden? = false ]) [
+  print ("game over")
   reset
   if epoch >= max_epochs [stop]
  ]
@@ -144,7 +194,6 @@ to reset
    ask patch gold_x gold_y [set pcolor yellow]
 end
 
-
 ;to go
 ;  if can-exit = 0 [stop]
 ;  ifelse any? turtles
@@ -154,7 +203,6 @@ end
 ;  [ stop ]
 ;  tick
 ;end
-
 
 to agent-loop
   set currentTurtle 0
@@ -175,11 +223,8 @@ to agent-loop
       ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
 
       ;; Updates the environment
-      print cur_move
       update-Q-value cur_move cur_xcor cur_ycor
       go-next cur_move
-
-
     ]
     set currentTurtle currentTurtle + 1
   ;;  print currentTurtle
@@ -187,6 +232,10 @@ to agent-loop
 
   ]
 end
+
+;;;
+; Movement functions
+;;;
 
 to go-next [ move ]
   ifelse move = 0
@@ -252,147 +301,85 @@ to go-grab
   ]
 end
 
-;; Manually Controlled
-
-to turtle-go-down
-  let new-ycor ([ycor] of turtle 0)
-  if( new-ycor - 1 != -9)
-  [set new-ycor new-ycor - 1
-    ask turtle 0 [ set ycor new-ycor]
-  ]
-  pit-fall
-end
-
-to turtle-go-up
-    let new-ycor ([ycor] of turtle 0)
-    if( new-ycor + 1 != 9)
-  [set new-ycor new-ycor + 1
-     ask turtle 0 [ set ycor new-ycor]
-  ]
-  pit-fall
-end
-
-
-to turtle-go-left
-  let new-xcor ([xcor] of turtle 0)
-  if( new-xcor - 1 != -9)
-  [set new-xcor new-xcor - 1
-    ask turtle 0 [ set xcor new-xcor]
-  ]
-  pit-fall
-end
-
-to turtle-go-right
-   let new-xcor ([xcor] of turtle 0)
-  if( new-xcor + 1 != 9)
-  [set new-xcor new-xcor + 1
-    ask turtle 0 [ set xcor new-xcor]
-  ]
-  pit-fall
-end
-
-to turtle-go-grab
-  ifelse ([xcor] of turtle 0) = gold_x
- [ if ([ycor] of turtle 0) = gold_y
-    [
-      ask patch gold_x gold_y [set pcolor black]
-      ask turtle 0 [ set has_gold 1 ]
-    ]]
-  [
-  ]
-end
-
-
-
-;; Environment function
-
-to summon-gold
-  let check  0
-  let some_ycor 0
-  set some_ycor random-pycor
-  let some_xcor 0
-  set some_xcor random-pxcor
-      while [abs some_ycor + abs some_xcor = 16]
-    [
-        set some_ycor random-pycor
-        set some_xcor random-pxcor
-    ]
-  if ( [pcolor] of patch some_xcor some_ycor = brown)
-  [ set check 1]
-  while [ check = 1]
-  [
-
-        set some_ycor random-pycor
-        set some_xcor random-pxcor
-    set check 0
-    if ( [pcolor] of patch some_xcor some_ycor = brown)
-    [ set check 1]
-  ]
-
-
-  set gold_x some_xcor
-  set gold_y some_ycor
-  ask patch some_xcor some_ycor [ set pcolor yellow]
-
-end
-
-to summon-exits
-
-  ask patch 8 8 [ set pcolor red]
-
-end
-
-to-report init-Q-values
-  report array:from-list n-values ( world-width  )  [
-    array:from-list n-values ( world-height ) [
-      array:from-list n-values num_moves [0] ]]
-end
-
-to-report init-visited-map
-  report array:from-list n-values world-width [ array:from-list n-values world-height [0] ]
-end
-
-to-report get-time-steps
-  report time_steps
-end
-
-to-report get-Q-values [x y]
-  report array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8))( y + 8)
-end
-
-to-report get-Q-value [x y move]
-  report array:item ( array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8)) (y + 8) ) move
-end
-
-to-report get-value-2d [x y matrix]
-  let x_idx (coord-to-idx x)
-  let y_idx (coord-to-idx y)
-  ifelse ((valid-idx x_idx) and (valid-idx y_idx))
-  [
-  report array:item (array:item matrix x_idx) y_idx
-  ]
-  [;carefully [print (word "error getting val of " x y)] [ print error-message ]
-   report -100]
-end
-
-to set-value-2d [x y matrix value]
-  let x_idx (coord-to-idx x)
-  let y_idx (coord-to-idx y)
-  ifelse ((valid-idx x_idx) and (valid-idx y_idx))
-  [
-   array:set (array:item matrix x_idx) y_idx value
-  ]
-  [carefully [ print (word "error setting a val of " x y) ] [ print error-message ]]
-end
-
-;; sets the value for the current agent
-to set-agent-Q-value [x y move val ]
- ask turtle currentTurtle [ array:set (get-Q-values x  y  ) move val]
-end
-
 to pit-fall
       if ( [pcolor] of patch xcor ycor = brown)
   [ask turtle currentTurtle [ set hidden? true ]]
+end
+
+;; Manually Controlled
+
+to turtle-go-up
+  let pl_num to-num your_color
+  let cur_xcor [xcor] of player pl_num
+  let cur_ycor [ycor] of player pl_num
+
+  if( cur_ycor != offset)
+  [
+    turtle-pit-fall cur_xcor (cur_ycor + 1) pl_num
+    ask (player pl_num) [set ycor (cur_ycor + 1)]
+  ]
+end
+
+to turtle-go-right
+  let pl_num to-num your_color
+  let cur_xcor [xcor] of player pl_num
+  let cur_ycor [ycor] of player pl_num
+
+  if( cur_xcor != offset)
+  [
+    turtle-pit-fall (cur_xcor + 1) cur_ycor pl_num
+    ask (player pl_num) [set xcor (xcor + 1)]
+  ]
+end
+
+to turtle-go-down
+  let pl_num to-num your_color
+  let cur_xcor [xcor] of player pl_num
+  let cur_ycor [ycor] of player pl_num
+
+  if( cur_ycor != (- offset))
+  [
+    turtle-pit-fall cur_xcor (cur_ycor - 1) pl_num
+    ask (player pl_num) [set ycor (cur_ycor - 1)]
+  ]
+end
+
+to turtle-go-left
+  let pl_num to-num your_color
+  let cur_xcor [xcor] of player pl_num
+  let cur_ycor [ycor] of player pl_num
+
+  if( cur_xcor != (- offset))
+  [
+    turtle-pit-fall (cur_xcor - 1) cur_ycor pl_num
+    ask (player pl_num) [set xcor (cur_xcor - 1)]
+  ]
+end
+
+to turtle-go-grab
+  let pl_num to-num your_color
+  if ([xcor] of turtle pl_num) = gold_x
+  [
+    if ([ycor] of turtle pl_num) = gold_y
+    [
+      ask patch gold_x gold_y [set pcolor black]
+      ask turtle pl_num [ set has_gold 1 ]
+    ]
+  ]
+end
+
+to turtle-pit-fall [x y pl_num]
+  if ( [pcolor] of patch x y = brown)
+  [
+  ask player pl_num [ set hidden? true ]
+  ]
+end
+
+
+;; Environment functions
+
+to-report get-time-steps
+  report time_steps
 end
 
 ;; Does this work before adding the reward ??
@@ -405,31 +392,6 @@ to-report can-exit
     [ report 0]
   report 1
 
-end
-
-to-report max_q_val [ x y move]
-   let loc_x x
-   let loc_y y
-      ifelse move = 0
-   [ set loc_y (loc_y - 1 )
-      if loc_y = -9
-      [set loc_y -8]
-  ]
-  [ifelse move = 1
-    [set loc_x (loc_x + 1)
-      if loc_x = 9
-      [set loc_x 8]
-    ]
-    [ifelse move = 2
-      [ set loc_y (loc_y + 1 )
-        if loc_y = 9
-        [set loc_y 8]
-      ]
-        [ set loc_x (loc_x - 1)
-        if loc_x = -9
-        [set loc_x -8] ]]]
-
-   report max array:to-list get-q-values loc_x loc_y
 end
 
 to-report get-next-move [ x y move]
@@ -458,6 +420,97 @@ to-report get-next-move [ x y move]
 
 end
 
+;;; Reinforcement Learning
+
+to-report next-move [x y]
+  ifelse move_algo = "Greedy"
+     [report new-move-e-greedy x y]
+     [ifelse move_algo = "Soft"
+     [report new-move-soft x y]
+     [report new-move-reactive x y]]
+end
+
+to-report new-move-e-greedy [ x y]
+   let rand random-float 1
+   ifelse rand < epsilon
+   [
+    report random num_moves
+   ]
+   [
+    let move_values array:to-list (get-Q-values x y)
+    report ( position (max move_values) move_values )
+   ]
+end
+
+to-report new-move-soft [ x y]
+   let moves array:to-list ( get-Q-values x y)
+  let probs map [ [?1] -> (exp (?1 / temperature)) ] moves
+  let sum_q sum probs
+  set probs map [ [?1] -> ?1 / sum_q] probs
+
+  let rand random-float 1
+  let probs_sum item 0 probs
+  let action_index 0
+  while [ (probs_sum < rand ) and (action_index != 5 )]
+  [
+   set action_index ( action_index + 1)
+   set probs_sum (probs_sum + (item action_index probs))
+  ]
+  report item action_index [ 0 1 2 3 4 ]
+end
+
+to-report get-reward [ move ]
+
+  let cur_xcor ([xcor] of turtle currentTurtle)
+  let cur_ycor ([ycor] of turtle currentTurtle)
+  ;did it grab the gold
+  ifelse move = 4
+  [
+  if ( [pcolor] of patch cur_xcor cur_ycor = yellow)
+  [ report 100 ]
+  ]
+  [ report -10]
+
+  ;; get new position
+  ifelse move = 0
+   [ set cur_ycor (cur_ycor - 1 )
+      if cur_ycor = -9
+      [report -15] ; hit the wall
+  ]
+  [ifelse move = 1
+    [set cur_xcor (cur_xcor + 1)
+      if cur_xcor = 9
+      [report -15] ; hit the wall
+    ]
+    [ifelse move = 2
+      [ set cur_ycor (cur_ycor + 1 )
+        if cur_ycor = 9
+        [report -15] ; hit the wall
+      ]
+        [ set cur_xcor (cur_xcor - 1)
+        if cur_xcor = -9
+        [report -15] ; hit the wall
+         ]]]
+
+
+  ;did it fall into a pit
+   if ( [pcolor] of patch cur_xcor cur_ycor = brown)
+  [ report -250 ]
+
+  ;did it sense a breeze
+     if ( [pcolor] of patch cur_xcor cur_ycor = blue)
+  [ report -5]
+
+  ; did it exit with a gold
+  if ( [pcolor] of patch cur_xcor cur_ycor = red ) and ([has_Gold] of turtle currentTurtle = 1)
+  [ report 1000]
+
+
+  ;; case when hitting another agent
+
+  report -1
+end
+
 to-report get-next-q-value [ x y move new_move]
      let loc_x x
    let loc_y y
@@ -483,14 +536,29 @@ to-report get-next-q-value [ x y move new_move]
     report get-q-value loc_x loc_y new_move
 end
 
-;;; Reinforcement Learning
+to-report max_q_val [ x y move]
+   let loc_x x
+   let loc_y y
+      ifelse move = 0
+   [ set loc_y (loc_y - 1 )
+      if loc_y = -9
+      [set loc_y -8]
+  ]
+  [ifelse move = 1
+    [set loc_x (loc_x + 1)
+      if loc_x = 9
+      [set loc_x 8]
+    ]
+    [ifelse move = 2
+      [ set loc_y (loc_y + 1 )
+        if loc_y = 9
+        [set loc_y 8]
+      ]
+        [ set loc_x (loc_x - 1)
+        if loc_x = -9
+        [set loc_x -8] ]]]
 
-to-report next-move [x y]
-  ifelse move_algo = "Greedy"
-     [report new-move-e-greedy x y]
-     [ifelse move_algo = "Soft"
-     [report new-move-soft x y]
-     [report new-move-reactive x y]]
+   report max array:to-list get-q-values loc_x loc_y
 end
 
 to update-Q-value [ move x y]
@@ -498,6 +566,31 @@ to update-Q-value [ move x y]
   [ update-Q-learning move x y]
   [ update-SARSA move x y]
 end
+
+to update-Q-learning [move x y]
+  ;; reward before the move
+   let q_val (get-Q-value x y move)
+   let cur_reward ( [reward] of turtle currentTurtle)
+   let cur_error  ( cur_reward + (discount_factor * ( max_q_val x y move )) - q_val )
+
+   let new_q_val ( q_val + (learning_rate * cur_error))
+   set-agent-Q-value x y move new_q_val
+
+
+end
+
+to update-SARSA [move x y]
+  let q_val (get-Q-value x y move)
+  let cur_reward ( [reward] of turtle currentTurtle)
+  let new_move (get-next-move x y move )
+
+  let cur_error ( cur_reward + (discount_factor * get-next-q-value x y move new_move) - q_val )
+
+     let new_q_val ( q_val + (learning_rate * cur_error))
+   set-agent-Q-value x y move new_q_val
+end
+
+;;; Reactive Learning
 
 to-report new-move-reactive [x y]
   ifelse (update-neighbors x y = 1)
@@ -512,66 +605,20 @@ to-report new-move-reactive [x y]
   ]
 end
 
-to-report new-move-soft [ x y]
-   let moves array:to-list ( get-Q-values x y)
-  let probs map [ [?1] -> (exp (?1 / temperature)) ] moves
-  let sum_q sum probs
-  set probs map [ [?1] -> ?1 / sum_q] probs
+to-report generate-probab [neighb_vals]
+  let danger_cells 0
+  let cnt 0
+  let probab 0
 
-  let rand random-float 1
-  let probs_sum item 0 probs
-  let action_index 0
-  while [ (probs_sum < rand ) and (action_index != 5 )]
+  repeat 4
   [
-   set action_index ( action_index + 1)
-   set probs_sum (probs_sum + (item action_index probs))
-  ]
-  print moves
-  report item action_index [ 0 1 2 3 4 ]
-end
-
-to-report coord-to-idx [coord]
-  report (coord + offset)
-end
-
-to-report idx-to-coord [idx]
-  report (idx - offset)
-end
-
-to-report valid-idx [idx]
-  ifelse (idx >= 0 and idx < world-width)
-  [report true]
-  [report false]
-end
-
-to-report get-neighbor-values [x y]
-  let up_val (get-value-2d x (y + 1) visited_map)
-  let down_val (get-value-2d x (y - 1) visited_map)
-  let right_val (get-value-2d (x + 1) y visited_map)
-  let left_val (get-value-2d (x - 1) y visited_map)
-
-  let my_neighbors []
-  set my_neighbors lput down_val my_neighbors
-  set my_neighbors lput right_val my_neighbors
-  set my_neighbors lput up_val my_neighbors
-  set my_neighbors lput left_val my_neighbors
-
-  report my_neighbors
-end
-
-to set-cell-grey [x y]
-  let col [pcolor] of patch x y
-
-  if (col = black)
-  [
-   ask patch x y [set pcolor grey]
+    if ((item cnt neighb_vals) != 1)
+    [set danger_cells (danger_cells + 1)]
+    set cnt (cnt + 1)
   ]
 
-  if (col = cyan)
-  [
-    ask patch x y [set pcolor white]
-  ]
-
+  set probab (1 - (1 / danger_cells))
+  report probab
 end
 
 to-report update-neighbors [x y]
@@ -660,20 +707,29 @@ to-report update-neighbors [x y]
 
 end
 
-to-report generate-probab [neighb_vals]
-  let danger_cells 0
-  let cnt 0
-  let probab 0
+;;;
+; Helper functions (printing, getters, setters, coordinate converters, etc)
+;;;
 
-  repeat 4
+to-report get-value-2d [x y matrix]
+  let x_idx (coord-to-idx x)
+  let y_idx (coord-to-idx y)
+  ifelse ((valid-idx x_idx) and (valid-idx y_idx))
   [
-    if ((item cnt neighb_vals) != 1)
-    [set danger_cells (danger_cells + 1)]
-    set cnt (cnt + 1)
+  report array:item (array:item matrix x_idx) y_idx
   ]
+  [;carefully [print (word "error getting val of " x y)] [ print error-message ]
+   report -100]
+end
 
-  set probab (1 - (1 / danger_cells))
-  report probab
+to set-value-2d [x y matrix value]
+  let x_idx (coord-to-idx x)
+  let y_idx (coord-to-idx y)
+  ifelse ((valid-idx x_idx) and (valid-idx y_idx))
+  [
+   array:set (array:item matrix x_idx) y_idx value
+  ]
+  [carefully [ print (word "error setting a val of " x y) ] [ print error-message ]]
 end
 
 to print-matrix [matrix]
@@ -686,100 +742,70 @@ to print-matrix [matrix]
   print ("========================")
 end
 
-to-report new-move-e-greedy [ x y]
-   let rand random-float 1
-   ifelse rand < epsilon
-   [
-    report random num_moves
-   ]
-   [
-    let move_values array:to-list (get-Q-values x y)
-    report ( position (max move_values) move_values )
-   ]
-
+to-report coord-to-idx [coord]
+  report (coord + offset)
 end
 
-to-report get-reward [ move ]
+to-report idx-to-coord [idx]
+  report (idx - offset)
+end
 
-  let cur_xcor ([xcor] of turtle currentTurtle)
-  let cur_ycor ([ycor] of turtle currentTurtle)
-  ;did it grab the gold
-  ifelse move = 4
+to-report valid-idx [idx]
+  ifelse (idx >= 0 and idx < world-width)
+  [report true]
+  [report false]
+end
+
+to-report get-neighbor-values [x y]
+  let up_val (get-value-2d x (y + 1) visited_map)
+  let down_val (get-value-2d x (y - 1) visited_map)
+  let right_val (get-value-2d (x + 1) y visited_map)
+  let left_val (get-value-2d (x - 1) y visited_map)
+
+  let my_neighbors []
+  set my_neighbors lput down_val my_neighbors
+  set my_neighbors lput right_val my_neighbors
+  set my_neighbors lput up_val my_neighbors
+  set my_neighbors lput left_val my_neighbors
+
+  report my_neighbors
+end
+
+to set-cell-grey [x y]
+  let col [pcolor] of patch x y
+
+  if (col = black)
   [
-  if ( [pcolor] of patch cur_xcor cur_ycor = yellow)
-  [ report 100 ]
+   ask patch x y [set pcolor grey]
   ]
-  [ report -10]
 
-  ;; get new position
-  ifelse move = 0
-   [ set cur_ycor (cur_ycor - 1 )
-      if cur_ycor = -9
-      [report -15] ; hit the wall
+  if (col = cyan)
+  [
+    ask patch x y [set pcolor white]
   ]
-  [ifelse move = 1
-    [set cur_xcor (cur_xcor + 1)
-      if cur_xcor = 9
-      [report -15] ; hit the wall
-    ]
-    [ifelse move = 2
-      [ set cur_ycor (cur_ycor + 1 )
-        if cur_ycor = 9
-        [report -15] ; hit the wall
-      ]
-        [ set cur_xcor (cur_xcor - 1)
-        if cur_xcor = -9
-        [report -15] ; hit the wall
-         ]]]
-
-
-  ;did it fall into a pit
-   if ( [pcolor] of patch cur_xcor cur_ycor = brown)
-  [ report -250 ]
-
-  ;did it sense a breeze
-     if ( [pcolor] of patch cur_xcor cur_ycor = blue)
-  [ report -5]
-
-  ; did it exit with a gold
-  if ( [pcolor] of patch cur_xcor cur_ycor = red ) and ([has_Gold] of turtle currentTurtle = 1)
-  [ report 1000]
-
-
-  ;; case when hitting another agent
-
-  report -1
 end
 
-to update-Q-learning [move x y]
-  ;; reward before the move
-   let q_val (get-Q-value x y move)
-   let cur_reward ( [reward] of turtle currentTurtle)
-   let cur_error  ( cur_reward + (discount_factor * ( max_q_val x y move )) - q_val )
-
-   let new_q_val ( q_val + (learning_rate * cur_error))
-   set-agent-Q-value x y move new_q_val
-
-
+to-report get-Q-values [x y]
+  report array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8))( y + 8)
 end
 
-to update-SARSA [move x y]
-  let q_val (get-Q-value x y move)
-  let cur_reward ( [reward] of turtle currentTurtle)
-  let new_move (get-next-move x y move )
-
-  let cur_error ( cur_reward + (discount_factor * get-next-q-value x y move new_move) - q_val )
-
-     let new_q_val ( q_val + (learning_rate * cur_error))
-   set-agent-Q-value x y move new_q_val
-
-
+to-report get-Q-value [x y move]
+  report array:item ( array:item (array:item ( [Q_values] of turtle currentTurtle ) (x + 8)) (y + 8) ) move
 end
 
+;; sets the value for the current agent
+to set-agent-Q-value [x y move val ]
+ ask turtle currentTurtle [ array:set (get-Q-values x  y  ) move val]
+end
 
-
-
-
+to-report to-num [chosen_value]
+  ifelse (chosen_value = "white")
+  [report 0]
+  [ifelse (chosen_value = "blue")
+    [report 1]
+    [ifelse(chosen_value = "green")
+      [report 2][report 3]]]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -826,16 +852,16 @@ NIL
 1
 
 BUTTON
-278
-273
-341
-306
-Right
-turtle-go-right
+355
+345
+420
+378
+right
+turtle-go-right\n
 NIL
 1
 T
-TURTLE
+OBSERVER
 NIL
 NIL
 NIL
@@ -843,16 +869,16 @@ NIL
 1
 
 BUTTON
-213
-273
-276
-306
+215
+347
+278
+380
 left
 turtle-go-left
 NIL
 1
 T
-TURTLE
+OBSERVER
 NIL
 NIL
 NIL
@@ -860,16 +886,16 @@ NIL
 1
 
 BUTTON
-212
-238
-275
-271
-Up
-turtle-go-up
+285
+305
+348
+338
+up
+turtle-go-up\n
 NIL
 1
 T
-TURTLE
+OBSERVER
 NIL
 NIL
 NIL
@@ -877,16 +903,16 @@ NIL
 1
 
 BUTTON
-277
-238
-340
-271
-Down
-turtle-go-down\n
+282
+388
+352
+421
+down
+turtle-go-down
 NIL
 1
 T
-TURTLE
+OBSERVER
 NIL
 NIL
 NIL
@@ -911,11 +937,11 @@ NIL
 1
 
 BUTTON
-343
-240
-406
-273
-Grab
+425
+295
+490
+328
+grab
 turtle-go-grab
 NIL
 1
@@ -1018,6 +1044,16 @@ get-time-steps
 1
 11
 
+CHOOSER
+257
+247
+396
+292
+your_color
+your_color
+"white" "blue" "green" "pink"
+2
+
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -1090,16 +1126,17 @@ Line -7500403 true 150 100 80 30
 Line -7500403 true 150 100 220 30
 
 butterfly
-true
-0
-Polygon -7500403 true true 150 165 209 199 225 225 225 255 195 270 165 255 150 240
-Polygon -7500403 true true 150 165 89 198 75 225 75 255 105 270 135 255 150 240
-Polygon -7500403 true true 139 148 100 105 55 90 25 90 10 105 10 135 25 180 40 195 85 194 139 163
-Polygon -7500403 true true 162 150 200 105 245 90 275 90 290 105 290 135 275 180 260 195 215 195 162 165
+false
+2
+Polygon -6459832 true false 150 165 209 199 225 225 225 255 195 270 165 255 150 240
+Polygon -6459832 true false 150 165 89 198 75 225 75 255 105 270 135 255 150 240
+Polygon -955883 true true 139 148 100 105 55 90 25 90 10 105 10 135 25 180 40 195 85 194 139 163
+Polygon -955883 true true 162 150 200 105 245 90 275 90 290 105 290 135 275 180 260 195 215 195 162 165
 Polygon -16777216 true false 150 255 135 225 120 150 135 120 150 105 165 120 180 150 165 225
 Circle -16777216 true false 135 90 30
 Line -16777216 false 150 105 195 60
 Line -16777216 false 150 105 105 60
+Polygon -2674135 true false 60 135
 
 car
 false
@@ -1110,6 +1147,35 @@ Circle -16777216 true false 30 180 90
 Polygon -16777216 true false 162 80 132 78 134 135 209 135 194 105 189 96 180 89
 Circle -7500403 true true 47 195 58
 Circle -7500403 true true 195 195 58
+
+cat
+false
+0
+Line -7500403 true 285 240 210 240
+Line -7500403 true 195 300 165 255
+Line -7500403 true 15 240 90 240
+Line -7500403 true 285 285 195 240
+Line -7500403 true 105 300 135 255
+Line -16777216 false 150 270 150 285
+Line -16777216 false 15 75 15 120
+Polygon -7500403 true true 300 15 285 30 255 30 225 75 195 60 255 15
+Polygon -7500403 true true 285 135 210 135 180 150 180 45 285 90
+Polygon -7500403 true true 120 45 120 210 180 210 180 45
+Polygon -7500403 true true 180 195 165 300 240 285 255 225 285 195
+Polygon -7500403 true true 180 225 195 285 165 300 150 300 150 255 165 225
+Polygon -7500403 true true 195 195 195 165 225 150 255 135 285 135 285 195
+Polygon -7500403 true true 15 135 90 135 120 150 120 45 15 90
+Polygon -7500403 true true 120 195 135 300 60 285 45 225 15 195
+Polygon -7500403 true true 120 225 105 285 135 300 150 300 150 255 135 225
+Polygon -7500403 true true 105 195 105 165 75 150 45 135 15 135 15 195
+Polygon -7500403 true true 285 120 270 90 285 15 300 15
+Line -7500403 true 15 285 105 240
+Polygon -7500403 true true 15 120 30 90 15 15 0 15
+Polygon -7500403 true true 0 15 15 30 45 30 75 75 105 60 45 15
+Line -16777216 false 164 262 209 262
+Line -16777216 false 223 231 208 261
+Line -16777216 false 136 262 91 262
+Line -16777216 false 77 231 92 261
 
 circle
 false
@@ -1220,6 +1286,81 @@ line half
 true
 0
 Line -7500403 true 150 0 150 150
+
+moth
+true
+0
+Polygon -16777216 true false 151 76 138 91 138 284 150 296 162 286 162 91
+Polygon -7500403 true true 164 106 184 79 205 61 236 48 259 53 279 86 287 119 289 158 278 177 256 182 164 181
+Polygon -7500403 true true 136 110 119 82 110 71 85 61 59 48 36 56 17 88 6 115 2 147 15 178 134 178
+Polygon -7500403 true true 46 181 28 227 50 255 77 273 112 283 135 274 135 180
+Polygon -7500403 true true 165 185 254 184 272 224 255 251 236 267 191 283 164 276
+Line -7500403 true 167 47 159 82
+Line -7500403 true 136 47 145 81
+Circle -7500403 true true 165 45 8
+Circle -7500403 true true 134 45 6
+Circle -7500403 true true 133 44 7
+Circle -7500403 true true 133 43 8
+
+moth_blue
+true
+0
+Polygon -16777216 true false 151 76 138 91 138 284 150 296 162 286 162 91
+Polygon -13345367 true false 164 106 184 79 205 61 236 48 259 53 279 86 287 119 289 158 278 177 256 182 164 181
+Polygon -13345367 true false 136 110 119 82 110 71 85 61 59 48 36 56 17 88 6 115 2 147 15 178 134 178
+Polygon -13791810 true false 46 181 28 227 50 255 77 273 112 283 135 274 135 180
+Polygon -13791810 true false 165 185 254 184 272 224 255 251 236 267 191 283 164 276
+Line -7500403 true 167 47 159 82
+Line -7500403 true 136 47 145 81
+Circle -7500403 true true 165 45 8
+Circle -7500403 true true 134 45 6
+Circle -7500403 true true 133 44 7
+Circle -7500403 true true 133 43 8
+
+moth_green
+true
+0
+Polygon -16777216 true false 151 76 138 91 138 284 150 296 162 286 162 91
+Polygon -13840069 true false 164 106 184 79 205 61 236 48 259 53 279 86 287 119 289 158 278 177 256 182 164 181
+Polygon -13840069 true false 136 110 119 82 110 71 85 61 59 48 36 56 17 88 6 115 2 147 15 178 134 178
+Polygon -14835848 true false 46 181 28 227 50 255 77 273 112 283 135 274 135 180
+Polygon -14835848 true false 165 185 254 184 272 224 255 251 236 267 191 283 164 276
+Line -7500403 true 167 47 159 82
+Line -7500403 true 136 47 145 81
+Circle -7500403 true true 165 45 8
+Circle -7500403 true true 134 45 6
+Circle -7500403 true true 133 44 7
+Circle -7500403 true true 133 43 8
+
+moth_lila
+true
+0
+Polygon -16777216 true false 151 76 138 91 138 284 150 296 162 286 162 91
+Polygon -5825686 true false 164 106 184 79 205 61 236 48 259 53 279 86 287 119 289 158 278 177 256 182 164 181
+Polygon -5825686 true false 136 110 119 82 110 71 85 61 59 48 36 56 17 88 6 115 2 147 15 178 134 178
+Polygon -2064490 true false 46 181 28 227 50 255 77 273 112 283 135 274 135 180
+Polygon -2064490 true false 165 185 254 184 272 224 255 251 236 267 191 283 164 276
+Line -7500403 true 167 47 159 82
+Line -7500403 true 136 47 145 81
+Circle -7500403 true true 165 45 8
+Circle -7500403 true true 134 45 6
+Circle -7500403 true true 133 44 7
+Circle -7500403 true true 133 43 8
+
+moth_white
+true
+0
+Polygon -16777216 true false 151 76 138 91 138 284 150 296 162 286 162 91
+Polygon -1 true false 164 106 184 79 205 61 236 48 259 53 279 86 287 119 289 158 278 177 256 182 164 181
+Polygon -1 true false 136 110 119 82 110 71 85 61 59 48 36 56 17 88 6 115 2 147 15 178 134 178
+Polygon -1 true false 46 181 28 227 50 255 77 273 112 283 135 274 135 180
+Polygon -1 true false 165 185 254 184 272 224 255 251 236 267 191 283 164 276
+Line -7500403 true 167 47 159 82
+Line -7500403 true 136 47 145 81
+Circle -7500403 true true 165 45 8
+Circle -7500403 true true 134 45 6
+Circle -7500403 true true 133 44 7
+Circle -7500403 true true 133 43 8
 
 pentagon
 false
@@ -1334,6 +1475,20 @@ Polygon -10899396 true false 132 85 134 64 107 51 108 17 150 2 192 18 192 52 169
 Polygon -10899396 true false 85 204 60 233 54 254 72 266 85 252 107 210
 Polygon -7500403 true true 119 75 179 75 209 101 224 135 220 225 175 261 128 261 81 224 74 135 88 99
 
+violet_moth
+false
+3
+Polygon -8630108 true false 150 165 209 199 270 225 285 285 225 285 165 255 150 240
+Polygon -8630108 true false 150 165 89 198 30 225 15 285 90 285 135 255 150 240
+Polygon -8630108 true false 139 148 100 105 75 30 11 15 0 105 10 135 25 180 40 195 85 194 139 163
+Polygon -8630108 true false 162 150 200 105 210 30 290 9 290 105 290 135 275 180 260 195 215 195 162 165
+Polygon -16777216 true false 150 285 120 240 120 150 135 120 150 105 165 120 180 150 180 240
+Circle -16777216 true false 105 60 90
+Line -16777216 false 150 90 195 45
+Line -16777216 false 135 75 90 30
+Polygon -2674135 true false 60 135
+Polygon -955883 true false 99 164 55 115
+
 wheel
 false
 0
@@ -1346,6 +1501,20 @@ Line -7500403 true 216 40 79 269
 Line -7500403 true 40 84 269 221
 Line -7500403 true 40 216 269 79
 Line -7500403 true 84 40 221 269
+
+white_moth
+false
+3
+Polygon -1 true false 150 165 209 199 270 225 285 285 225 285 165 255 150 240
+Polygon -1 true false 150 165 89 198 30 225 15 285 90 285 135 255 150 240
+Polygon -1 true false 139 148 100 105 75 30 11 15 0 105 10 135 25 180 40 195 85 194 139 163
+Polygon -1 true false 162 150 200 105 210 30 290 9 290 105 290 135 275 180 260 195 215 195 162 165
+Polygon -16777216 true false 150 285 120 240 120 150 135 120 150 105 165 120 180 150 180 240
+Circle -16777216 true false 105 60 90
+Line -16777216 false 150 90 195 45
+Line -16777216 false 135 75 90 30
+Polygon -2674135 true false 60 135
+Polygon -955883 true false 99 164 55 115
 
 wolf
 false
