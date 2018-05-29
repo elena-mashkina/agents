@@ -1,7 +1,7 @@
 ;;; Variable we will use
 
 
-globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map color_map offset]
+globals [num_moves gold_x gold_y gold_count gridSize currentTurtle bExit epoch time_steps epsilon visited_map offset]
 
 
 ;;; Entitities
@@ -13,12 +13,9 @@ breed [players player]
 extensions [array]
 ;;;
 
-;;;
-
 players-own [ init_xcor init_ycor has_gold is_cool Q_values reward total_reward]
-;pits-own [ init_xcor init_ycor ]
 
-;;; Setting up.
+;;; Setting up
 to setup
   clear-all
   init-globals
@@ -40,7 +37,6 @@ to init-globals
   set num_moves 5
   set epoch 0
   set epsilon 0.9
-  set color_map init-color-map
   set visited_map init-visited-map
 end
 
@@ -253,8 +249,7 @@ to go-grab
 end
 
 
-
-;; Environment function
+;; Environment functions
 
 to summon-gold
   let check  0
@@ -298,14 +293,8 @@ to-report init-Q-values
       array:from-list n-values num_moves [0] ]]
 end
 
-
 to-report init-visited-map
   report array:from-list n-values world-width [ array:from-list n-values world-height [0] ]
-end
-
-
-to-report init-color-map
-  report array:from-list n-values world-width [array:from-list n-values world-height ["none"] ]
 end
 
 to-report get-Q-values [x y]
@@ -340,9 +329,6 @@ end
 to set-agent-Q-value [x y move val ]
  ask turtle currentTurtle [ array:set (get-Q-values x  y  ) move val]
 end
-
-
-;;;; Environment functions.
 
 to pit-fall
       if ( [pcolor] of patch xcor ycor = brown)
@@ -451,14 +437,14 @@ to-report new-move-soft [ x y]
 end
 
 to-report new-move-reactive [x y]
-  update-maps x y
-  report random num_moves
-end
+   update-neighbors x y
 
-to update-maps [x y]
-  let patch_color [pcolor] of patch x y
-  update-neighbor x y patch_color
-
+   let rand random-float 1
+   let eps 0.8
+   ifelse rand < eps
+   [report random num_moves]
+   ; go in the direction of safety (safety == 1)
+   [report position (max (get-neighbor-values x y )) (get-neighbor-values x y )]
 end
 
 to-report coord-to-idx [coord]
@@ -475,32 +461,40 @@ to-report valid-idx [idx]
   [report false]
 end
 
-to update-neighbor [x y col]
+to-report get-neighbor-values [x y]
+  let up_val (get-value-2d x (y + 1) visited_map)
+  let down_val (get-value-2d x (y - 1) visited_map)
+  let right_val (get-value-2d (x + 1) y visited_map)
+  let left_val (get-value-2d (x - 1) y visited_map)
+
+  let my_neighbors []
+  set my_neighbors lput down_val my_neighbors
+  set my_neighbors lput right_val my_neighbors
+  set my_neighbors lput up_val my_neighbors
+  set my_neighbors lput left_val my_neighbors
+
+  report my_neighbors
+end
+
+to update-neighbors [x y]
 ;  print (".............")
 ;  let map_value get-value-2d x y visited_map
 ;  print (word "x " x " y " y " value " map_value)
 ;  print (".............")
+
+  let neighb_val get-neighbor-values x y
+
+  let col [pcolor] of patch x y
 
   if (col = black or col = red)
   [
     set-value-2d x y visited_map 1
     ask patch x y [set pcolor grey]
 
-    if ( y != offset) ; if x y cell is not on the upper world border
-    [
-      ;getting the value of the upper cell
-      let up_val (get-value-2d x (y + 1) visited_map)
-      if (up_val != 1)
-      [set-value-2d x (y + 1) visited_map 1]
-
-      ask patch x (y + 1) [set pcolor grey]
-    ]
 
     if ( y != (- offset))  ; if x y cell is not on an the lower world border
     [
-      ;getting the value of the lower cell
-      let down_val (get-value-2d x (y - 1) visited_map)
-      if (down_val != 1)
+      if ((item 0 neighb_val) != 1)
       [set-value-2d x (y - 1) visited_map 1]
 
       ask patch x (y - 1) [set pcolor grey]
@@ -508,19 +502,23 @@ to update-neighbor [x y col]
 
     if ( x != offset) ; if x y cell is not on an the right world border
     [
-      ;getting the value of the cell to the right
-      let right_val (get-value-2d (x + 1) y visited_map)
-      if (right_val != 1)
+      if ((item 1 neighb_val) != 1)
       [set-value-2d (x + 1) y visited_map 1]
 
       ask patch (x + 1) y [set pcolor grey]
     ]
 
+    if ( y != offset) ; if x y cell is not on the upper world border
+    [
+      if ((item 2 neighb_val) != 1)
+      [set-value-2d x (y + 1) visited_map 1]
+
+      ask patch x (y + 1) [set pcolor grey]
+    ]
+
     if ( x != (- offset)) ; if x y cell is not on an the left world border
     [
-      ;getting the value of the cell to the left
-      let left_val (get-value-2d (x - 1) y visited_map)
-      if (left_val != 1)
+      if ((item 3 neighb_val) != 1)
       [set-value-2d (x - 1) y visited_map 1]
 
       ask patch (x - 1) y [set pcolor grey]
@@ -529,7 +527,48 @@ to update-neighbor [x y col]
 
   if (col = cyan)
   [
+    set-value-2d x y visited_map 1
+    ask patch x y [set pcolor white]
 
+;    if ( y != offset) ; if x y cell is not on the upper world border
+;    [
+;      ;getting the value of the upper cell
+;      let up_val (get-value-2d x (y + 1) visited_map)
+;      if (up_val != 1)
+;      [set-value-2d x (y + 1) visited_map 1]
+;
+;      ask patch x (y + 1) [set pcolor grey]
+;    ]
+;
+;    if ( y != (- offset))  ; if x y cell is not on an the lower world border
+;    [
+;      ;getting the value of the lower cell
+;      let down_val (get-value-2d x (y - 1) visited_map)
+;      if (down_val != 1)
+;      [set-value-2d x (y - 1) visited_map 1]
+;
+;      ask patch x (y - 1) [set pcolor grey]
+;    ]
+;
+;    if ( x != offset) ; if x y cell is not on an the right world border
+;    [
+;      ;getting the value of the cell to the right
+;      let right_val (get-value-2d (x + 1) y visited_map)
+;      if (right_val != 1)
+;      [set-value-2d (x + 1) y visited_map 1]
+;
+;      ask patch (x + 1) y [set pcolor grey]
+;    ]
+;
+;    if ( x != (- offset)) ; if x y cell is not on an the left world border
+;    [
+;      ;getting the value of the cell to the left
+;      let left_val (get-value-2d (x - 1) y visited_map)
+;      if (left_val != 1)
+;      [set-value-2d (x - 1) y visited_map 1]
+;
+;      ask patch (x - 1) y [set pcolor grey]
+;    ]
   ]
 
   print-matrix visited_map
