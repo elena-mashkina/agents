@@ -231,6 +231,9 @@ to agent-loop
 
       ; determines where it should move
       let cur_move next-move cur_xcor cur_ycor
+
+      if (move_algo != "Reactive")
+      [
      ; let cur_reward (get-Q-value cur_xcor cur_ycor cur_move)
       ; gets the reward from the upcoming move
       ask moth currentTurtle [set reward get-reward cur_move ]
@@ -238,6 +241,8 @@ to agent-loop
 
       ;; Updates the environment
       update-Q-value cur_move cur_xcor cur_ycor
+      ]
+
       go-next cur_move
     ]
     set currentTurtle currentTurtle + 1
@@ -619,7 +624,7 @@ to-report new-move-reactive [x y]
    let rand random-float 1
    ifelse rand < epsilon
    [report random num_moves]
-   [report position (max (get-neighbor-values x y )) (get-neighbor-values x y )] ;go in the direction of safety (safety == 1)
+   [report max-neighbor-values x y] ;go in the direction of safety (safety == 1)
   ]
 end
 
@@ -794,6 +799,31 @@ to-report get-neighbor-values [x y]
   report my_neighbors
 end
 
+to-report max-neighbor-values [x y]
+  let my_neighbors get-neighbor-values x y
+  let ones_cnt 0
+  let i 0
+
+  repeat 4 ; we only work with 4-neighborhood
+  [
+    if (item i my_neighbors = 1)
+    [
+      set ones_cnt (ones_cnt + 1)
+      set i (i + 1)
+    ]
+  ]
+
+  ifelse (ones_cnt != 4)
+  [
+
+   report position (max my_neighbors) my_neighbors
+  ]
+  [
+   report random 4
+  ]
+
+end
+
 to set-cell-grey [x y]
   let col [pcolor] of patch x y
 
@@ -842,8 +872,8 @@ end
 GRAPHICS-WINDOW
 210
 10
-491
-292
+439
+240
 -1
 -1
 13.0
@@ -856,10 +886,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--10
-10
--10
-10
+-8
+8
+-8
+8
 1
 1
 1
