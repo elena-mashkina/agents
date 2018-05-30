@@ -1,6 +1,5 @@
 ;;; Variable we will use
 
-;resize-world -5 5 -5 5 !!!!!!
 
 
 globals [num_moves gold_x gold_y gold_count currentTurtle bExit epoch time_steps epsilon visited_map offset temperature]
@@ -8,21 +7,21 @@ globals [num_moves gold_x gold_y gold_count currentTurtle bExit epoch time_steps
 
 ;;; Entitities
 ;;breed   [ pits pit]
-breed [players player]
+breed [moths moth]
 ;;;
 
 ;;; Extentions
 extensions [array]
 ;;;
 
-players-own [ init_xcor init_ycor has_gold is_cool Q_values reward total_reward]
+moths-own [ init_xcor init_ycor has_gold is_cool Q_values reward total_reward]
 
 ;;; Setting up
 to setup
   clear-all
   set-world-size
   init-globals
-  summon-players
+  summon-moths
   summon-pits
   summon-gold
   summon-exits
@@ -58,8 +57,8 @@ to-report init-Q-values
       array:from-list n-values num_moves [0] ]]
 end
 
-to summon-players
-    create-players 1
+to summon-moths
+    create-moths 1
   [
    set init_xcor offset
    set init_ycor offset
@@ -72,7 +71,7 @@ to summon-players
 
   ]
 
-    create-players 1
+    create-moths 1
   [
    set init_xcor offset
    set init_ycor (- offset)
@@ -84,7 +83,7 @@ to summon-players
    setxy init_xcor init_ycor
   ]
 
-      create-players 1
+      create-moths 1
   [
    set init_xcor (- offset)
    set init_ycor (- offset)
@@ -96,7 +95,7 @@ to summon-players
    setxy init_xcor init_ycor
   ]
 
-      create-players 1
+      create-moths 1
   [
    set init_xcor (- offset)
    set init_ycor  offset
@@ -173,7 +172,7 @@ to summon-exits
 end
 
 to go
-  ifelse ( can-exit = 0 ) or ( not any? turtles with [hidden? = false ])
+  ifelse ( can-exit = 0 ) or ( not any? moths with [hidden? = false ])
   [
 
     ifelse (can-exit = 0)[print ("moths won!")][print("game over")]
@@ -193,7 +192,7 @@ to go
 end
 
 ;to reset
-;  ask players [
+;  ask moths [
 ;   set xcor init_xcor
 ;   set ycor init_ycor
 ;   set has_gold 0
@@ -210,7 +209,7 @@ end
 
 ;to go
 ;  if can-exit = 0 [stop]
-;  ifelse any? turtles
+;  ifelse any? moths
 ;  [
 ;  agent-loop
 ;  ]
@@ -223,21 +222,26 @@ to agent-loop
   ;; loops through all agents
   while [ currentTurtle != 4]
   [
-    if ( [hidden?] of turtle currentTurtle ) != true
+    if ( [hidden?] of moth currentTurtle ) != true
     [
       ; go-random ; <<< naive agent
-      let cur_xcor ([xcor] of turtle currentTurtle)
-      let cur_ycor ([ycor] of turtle currentTurtle)
+      let cur_xcor ([xcor] of moth currentTurtle)
+      let cur_ycor ([ycor] of moth currentTurtle)
 
       ; determines where it should move
       let cur_move next-move cur_xcor cur_ycor
+
+      if (move_algo != "Reactive")
+      [
      ; let cur_reward (get-Q-value cur_xcor cur_ycor cur_move)
       ; gets the reward from the upcoming move
-      ask turtle currentTurtle [set reward get-reward cur_move ]
-      ask turtle currentTurtle [set total_reward ( reward + total_reward) ]
+      ask moth currentTurtle [set reward get-reward cur_move ]
+      ask moth currentTurtle [set total_reward ( reward + total_reward) ]
 
       ;; Updates the environment
       update-Q-value cur_move cur_xcor cur_ycor
+      ]
+
       go-next cur_move
     ]
     set currentTurtle currentTurtle + 1
@@ -253,14 +257,14 @@ end
 
 to go-next [ move ]
   ifelse move = 0
-  [ask turtle currentTurtle [go-down]]
+  [ask moth currentTurtle [go-down]]
   [ifelse move = 1
-    [ask turtle currentTurtle [go-right]]
+    [ask moth currentTurtle [go-right]]
     [ifelse move = 2
-      [ask turtle currentTurtle [go-up]]
+      [ask moth currentTurtle [go-up]]
       [ifelse move = 3
-        [ask turtle currentTurtle [go-left]]
-        [ask turtle currentTurtle [go-grab]]]]]
+        [ask moth currentTurtle [go-left]]
+        [ask moth currentTurtle [go-grab]]]]]
 end
 
 to go-random
@@ -272,7 +276,7 @@ to go-down
   let new-ycor 0
   if( ycor != (- offset))
   [set new-ycor ycor - 1
-  ask turtle currentTurtle [ setxy xcor new-ycor]
+  ask moth currentTurtle [ setxy xcor new-ycor]
   ]
   pit-fall
 end
@@ -281,7 +285,7 @@ to go-up
   let new-ycor 0
     if( ycor != offset)
   [set new-ycor ycor + 1
-  ask turtle currentTurtle [ setxy xcor  new-ycor]
+  ask moth currentTurtle [ setxy xcor  new-ycor]
   ]
   pit-fall
 end
@@ -290,7 +294,7 @@ to go-left
   let new-xcor 0
     if( xcor != (- offset))
   [set new-xcor xcor - 1
-  ask turtle currentTurtle [ setxy new-xcor ycor ]
+  ask moth currentTurtle [ setxy new-xcor ycor ]
   ]
   pit-fall
 end
@@ -299,7 +303,7 @@ to go-right
   let new-xcor 0
    if( xcor != offset)
   [set new-xcor xcor + 1
-  ask turtle currentTurtle [ setxy new-xcor ycor]
+  ask moth currentTurtle [ setxy new-xcor ycor]
   ]
   pit-fall
 end
@@ -309,7 +313,7 @@ to go-grab
  [ if ycor = gold_y
     [
       ask patch gold_x gold_y [set pcolor black]
-      ask turtle currentTurtle [ set has_gold 1 ]
+      ask moth currentTurtle [ set has_gold 1 ]
     ]]
   [
   ]
@@ -317,75 +321,75 @@ end
 
 to pit-fall
   if ( [pcolor] of patch xcor ycor = brown)
-  [ask turtle currentTurtle [ set hidden? true ]]
+  [ask moth currentTurtle [ set hidden? true ]]
 end
 
 ;; Manually Controlled
 
-to turtle-go-up
-  let pl_num to-num your_color
-  let cur_xcor [xcor] of player pl_num
-  let cur_ycor [ycor] of player pl_num
+to moth-go-up
+  let moth_num to-num your_color
+  let cur_xcor [xcor] of moth moth_num
+  let cur_ycor [ycor] of moth moth_num
 
   if( cur_ycor != offset)
   [
-    turtle-pit-fall cur_xcor (cur_ycor + 1) pl_num
-    ask (player pl_num) [set ycor (cur_ycor + 1)]
+    moth-pit-fall cur_xcor (cur_ycor + 1) moth_num
+    ask (moth moth_num) [set ycor (cur_ycor + 1)]
   ]
 end
 
-to turtle-go-right
-  let pl_num to-num your_color
-  let cur_xcor [xcor] of player pl_num
-  let cur_ycor [ycor] of player pl_num
+to moth-go-right
+  let moth_num to-num your_color
+  let cur_xcor [xcor] of moth moth_num
+  let cur_ycor [ycor] of moth moth_num
 
   if( cur_xcor != offset)
   [
-    turtle-pit-fall (cur_xcor + 1) cur_ycor pl_num
-    ask (player pl_num) [set xcor (xcor + 1)]
+    moth-pit-fall (cur_xcor + 1) cur_ycor moth_num
+    ask (moth moth_num) [set xcor (xcor + 1)]
   ]
 end
 
-to turtle-go-down
-  let pl_num to-num your_color
-  let cur_xcor [xcor] of player pl_num
-  let cur_ycor [ycor] of player pl_num
+to moth-go-down
+  let moth_num to-num your_color
+  let cur_xcor [xcor] of moth moth_num
+  let cur_ycor [ycor] of moth moth_num
 
   if( cur_ycor != (- offset))
   [
-    turtle-pit-fall cur_xcor (cur_ycor - 1) pl_num
-    ask (player pl_num) [set ycor (cur_ycor - 1)]
+    moth-pit-fall cur_xcor (cur_ycor - 1) moth_num
+    ask (moth moth_num) [set ycor (cur_ycor - 1)]
   ]
 end
 
-to turtle-go-left
-  let pl_num to-num your_color
-  let cur_xcor [xcor] of player pl_num
-  let cur_ycor [ycor] of player pl_num
+to moth-go-left
+  let moth_num to-num your_color
+  let cur_xcor [xcor] of moth moth_num
+  let cur_ycor [ycor] of moth moth_num
 
   if( cur_xcor != (- offset))
   [
-    turtle-pit-fall (cur_xcor - 1) cur_ycor pl_num
-    ask (player pl_num) [set xcor (cur_xcor - 1)]
+    moth-pit-fall (cur_xcor - 1) cur_ycor moth_num
+    ask (moth moth_num) [set xcor (cur_xcor - 1)]
   ]
 end
 
-to turtle-go-grab
-  let pl_num to-num your_color
-  if ([xcor] of turtle pl_num) = gold_x
+to moth-go-grab
+  let moth_num to-num your_color
+  if ([xcor] of moth moth_num) = gold_x
   [
-    if ([ycor] of turtle pl_num) = gold_y
+    if ([ycor] of moth moth_num) = gold_y
     [
       ask patch gold_x gold_y [set pcolor black]
-      ask turtle pl_num [ set has_gold 1 ]
+      ask moth moth_num [ set has_gold 1 ]
     ]
   ]
 end
 
-to turtle-pit-fall [x y pl_num]
+to moth-pit-fall [x y moth_num]
   if ( [pcolor] of patch x y = brown)
   [
-  ask player pl_num [ set hidden? true ]
+  ask moth moth_num [ set hidden? true ]
   ]
 end
 
@@ -398,7 +402,7 @@ end
 
 ;; Does this work before adding the reward ??
 to-report can-exit
-  ask turtles with [ has_gold = 1 ]
+  ask moths with [ has_gold = 1 ]
  [      if ( [pcolor] of patch xcor ycor = red)
     [ set bExit 1 ] ]
 
@@ -475,8 +479,8 @@ end
 
 to-report get-reward [ move ]
 
-  let cur_xcor ([xcor] of turtle currentTurtle)
-  let cur_ycor ([ycor] of turtle currentTurtle)
+  let cur_xcor ([xcor] of moth currentTurtle)
+  let cur_ycor ([ycor] of moth currentTurtle)
   ;did it grab the gold
   ifelse move = 4
   [
@@ -487,22 +491,22 @@ to-report get-reward [ move ]
 
   ;; get new position
   ifelse move = 0
-   [ set cur_ycor (cur_ycor - 1 )
-      if cur_ycor = (- offset)
+   [
+      if cur_ycor = (- offset - 1)
       [report -15] ; hit the wall
   ]
   [ifelse move = 1
-    [set cur_xcor (cur_xcor + 1)
-      if cur_xcor = offset
+    [
+      if cur_xcor = (offset + 1)
       [report -15] ; hit the wall
     ]
     [ifelse move = 2
-      [ set cur_ycor (cur_ycor + 1 )
-        if cur_ycor = offset
+      [
+        if cur_ycor = (offset + 1)
         [report -15] ; hit the wall
       ]
-        [ set cur_xcor (cur_xcor - 1)
-        if cur_xcor = (- offset)
+        [
+        if cur_xcor = (- offset - 1)
         [report -15] ; hit the wall
          ]]]
 
@@ -512,11 +516,11 @@ to-report get-reward [ move ]
   [ report -250 ]
 
   ;did it sense a breeze
-     if ( [pcolor] of patch cur_xcor cur_ycor = blue)
+     if ( [pcolor] of patch cur_xcor cur_ycor = cyan)
   [ report -5]
 
   ; did it exit with a gold
-  if ( [pcolor] of patch cur_xcor cur_ycor = red ) and ([has_Gold] of turtle currentTurtle = 1)
+  if ( [pcolor] of patch cur_xcor cur_ycor = red ) and ([has_Gold] of moth currentTurtle = 1)
   [ report 1000]
 
 
@@ -576,25 +580,6 @@ to-report max_q_val [ x y move]
         if loc_x = (- offset - 1)
         [set loc_x (- offset)] ]]]
 
-;      ifelse move = 0
-;   [ set loc_y (loc_y - 1 )
-;      if loc_y = -9
-;      [set loc_y -8]
-;  ]
-;  [ifelse move = 1
-;    [set loc_x (loc_x + 1)
-;      if loc_x = 9
-;      [set loc_x 8]
-;    ]
-;    [ifelse move = 2
-;      [ set loc_y (loc_y + 1 )
-;        if loc_y = 9
-;        [set loc_y 8]
-;      ]
-;        [ set loc_x (loc_x - 1)
-;        if loc_x = -9
-;        [set loc_x -8] ]]]
-
    report max array:to-list get-q-values loc_x loc_y
 end
 
@@ -607,7 +592,7 @@ end
 to update-Q-learning [move x y]
   ;; reward before the move
    let q_val (get-Q-value x y move)
-   let cur_reward ( [reward] of turtle currentTurtle)
+   let cur_reward ( [reward] of moth currentTurtle)
    let cur_error  ( cur_reward + (discount_factor * ( max_q_val x y move )) - q_val )
 
    let new_q_val ( q_val + (learning_rate * cur_error))
@@ -618,7 +603,7 @@ end
 
 to update-SARSA [move x y]
   let q_val (get-Q-value x y move)
-  let cur_reward ( [reward] of turtle currentTurtle)
+  let cur_reward ( [reward] of moth currentTurtle)
   let new_move (get-next-move x y move )
 
   let cur_error ( cur_reward + (discount_factor * get-next-q-value x y move new_move) - q_val )
@@ -638,7 +623,7 @@ to-report new-move-reactive [x y]
    let rand random-float 1
    ifelse rand < epsilon
    [report random num_moves]
-   [report position (max (get-neighbor-values x y )) (get-neighbor-values x y )] ;go in the direction of safety (safety == 1)
+   [report max-neighbor-values x y] ;go in the direction of safety (safety == 1)
   ]
 end
 
@@ -696,6 +681,11 @@ to-report update-neighbors [x y]
       [set-value-2d (x - 1) y visited_map 1]
       set-cell-grey (x - 1) y
     ]
+  ]
+
+  if (col = red)
+  [
+    set-value-2d x y visited_map 5
   ]
 
   if (col = cyan)
@@ -808,6 +798,31 @@ to-report get-neighbor-values [x y]
   report my_neighbors
 end
 
+to-report max-neighbor-values [x y]
+  let my_neighbors get-neighbor-values x y
+  let ones_cnt 0
+  let i 0
+
+  repeat 4 ; we only work with 4-neighborhood
+  [
+    if (item i my_neighbors = 1)
+    [
+      set ones_cnt (ones_cnt + 1)
+      set i (i + 1)
+    ]
+  ]
+
+  ifelse (ones_cnt != 4)
+  [
+
+   report position (max my_neighbors) my_neighbors
+  ]
+  [
+   report random 4
+  ]
+
+end
+
 to set-cell-grey [x y]
   let col [pcolor] of patch x y
 
@@ -823,16 +838,16 @@ to set-cell-grey [x y]
 end
 
 to-report get-Q-values [x y]
-  report array:item (array:item ( [Q_values] of turtle currentTurtle ) (coord-to-idx x))( coord-to-idx y)
+  report array:item (array:item ( [Q_values] of moth currentTurtle ) (coord-to-idx x))( coord-to-idx y)
 end
 
 to-report get-Q-value [x y move]
-  report array:item ( array:item (array:item ( [Q_values] of turtle currentTurtle ) (coord-to-idx x))( coord-to-idx y) ) move
+  report array:item ( array:item (array:item ( [Q_values] of moth currentTurtle ) (coord-to-idx x))( coord-to-idx y) ) move
 end
 
 ;; sets the value for the current agent
 to set-agent-Q-value [x y move val ]
- ask turtle currentTurtle [ array:set (get-Q-values x  y  ) move val]
+ ask moth currentTurtle [ array:set (get-Q-values x  y  ) move val]
 end
 
 to-report to-num [chosen_value]
@@ -856,8 +871,8 @@ end
 GRAPHICS-WINDOW
 210
 10
-335
-136
+439
+240
 -1
 -1
 13.0
@@ -870,10 +885,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--4
-4
--4
-4
+-8
+8
+-8
+8
 1
 1
 1
@@ -903,7 +918,7 @@ BUTTON
 420
 378
 right
-turtle-go-right\n
+moth-go-right\n
 NIL
 1
 T
@@ -920,7 +935,7 @@ BUTTON
 278
 380
 left
-turtle-go-left
+moth-go-left
 NIL
 1
 T
@@ -937,7 +952,7 @@ BUTTON
 348
 338
 up
-turtle-go-up\n
+moth-go-up\n
 NIL
 1
 T
@@ -954,7 +969,7 @@ BUTTON
 352
 421
 down
-turtle-go-down
+moth-go-down
 NIL
 1
 T
@@ -988,7 +1003,7 @@ BUTTON
 505
 378
 grab
-turtle-go-grab
+moth-go-grab
 NIL
 1
 T
@@ -1037,7 +1052,7 @@ CHOOSER
 move_algo
 move_algo
 "Greedy" "Soft" "Reactive"
-0
+2
 
 CHOOSER
 12
@@ -1047,7 +1062,7 @@ CHOOSER
 reward_algo
 reward_algo
 "Q learning" "SARSA"
-1
+0
 
 SLIDER
 13
@@ -1058,7 +1073,7 @@ learning_rate
 learning_rate
 0
 1
-0.7
+0.9
 0.1
 1
 NIL
@@ -1098,7 +1113,7 @@ CHOOSER
 your_color
 your_color
 "white" "blue" "green" "pink"
-0
+2
 
 CHOOSER
 523
@@ -1108,7 +1123,7 @@ CHOOSER
 world-size
 world-size
 "9 x 9" "13 x 13" "17 x 17" "21 x 21"
-0
+3
 
 @#$#@#$#@
 ## WHAT IS IT?
