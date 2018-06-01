@@ -194,27 +194,35 @@ to go
     ]
     [      print("game over")]
     ifelse (move_algo = "Reactive")
-      [ clear-turtles
+      [
+
+    if (epoch mod 4) = 0
+        [
+      set-current-plot "Win Count"
+      set-current-plot-pen "0reward"
+      plot win_rate
+    ;  print "Printed"
+
+        ]
+        clear-turtles
         clear-patches
       ;  clear-all
-  set-world-size
-  set currentTurtle 0
-  set num_moves 5
-  set epoch epoch + 1
-  set epsilon 0.9
-  set visited_map init-visited-map
-  set temperature 100
-  ;set win_rate 0
-  set golds init-golds
-  summon-moths
-  summon-pits
-  summon-gold
-  summon-exits
-          set time_steps 0
-  set bExit 0
-          reset-ticks
-
-
+        set-world-size
+        set currentTurtle 0
+        set num_moves 5
+        set epoch epoch + 1
+        set epsilon 0.9
+        set visited_map init-visited-map
+        set temperature 100
+        ;set win_rate 0
+        set golds init-golds
+        summon-moths
+        summon-pits
+        summon-gold
+        summon-exits
+        set time_steps 0
+        set bExit 0
+        reset-ticks
     ]
     [
     reset
@@ -238,6 +246,15 @@ to reset
    set xcor init_xcor
    set ycor init_ycor
    set has_gold 0
+
+    if (epoch mod 4) = 0
+  [
+      set-current-plot "Win Count"
+      set-current-plot-pen "0reward"
+      plot win_rate
+    ;  print "Printed"
+
+   ]
 
    set-current-plot "total_reward_in_epoch"
    set-current-plot-pen (word who "reward")
@@ -765,11 +782,6 @@ to-report update-neighbors [x y]
     ]
   ]
 
-  if (col = red)
-  [
-    set-value-2d x y visited_map 5
-  ]
-
   if (col = cyan)
   [
     set-value-2d x y visited_map 1
@@ -808,6 +820,7 @@ to-report update-neighbors [x y]
 
   if (col = yellow) and ( [has_gold] of turtle CurrentTurtle = 0)
   [
+    set-value-2d x y visited_map 5
     report 1
   ]
   ;print-matrix visited_map
@@ -1089,10 +1102,10 @@ NIL
 1
 
 BUTTON
-83
-10
-146
-43
+81
+11
+144
+44
 go
 go
 T
@@ -1160,7 +1173,7 @@ CHOOSER
 move_algo
 move_algo
 "Greedy" "Soft" "Reactive" "Naive"
-2
+0
 
 CHOOSER
 12
@@ -1170,7 +1183,7 @@ CHOOSER
 reward_algo
 reward_algo
 "Q learning" "SARSA"
-1
+0
 
 SLIDER
 13
@@ -1296,7 +1309,7 @@ SWITCH
 392
 Cooperation
 Cooperation
-1
+0
 1
 -1000
 
@@ -1331,6 +1344,23 @@ NIL
 NIL
 NIL
 1
+
+PLOT
+686
+261
+1143
+465
+Win Count
+epoch
+winning rate
+0.0
+250.0
+0.0
+10.0
+true
+false
+"ask moths [\n  let pen-name (word who \"reward\")\n  create-temporary-plot-pen pen-name\n  set-current-plot-pen pen-name\n  set-plot-pen-color color\n]" ""
+PENS
 
 @#$#@#$#@
 ## WHAT IS IT?
