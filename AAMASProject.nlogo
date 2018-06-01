@@ -2,7 +2,7 @@
 
 
 
-globals [num_moves gold_x gold_y gold_count currentTurtle bExit epoch time_steps epsilon visited_map offset temperature]
+globals [win_rate num_moves gold_x gold_y golds currentTurtle bExit epoch time_steps epsilon visited_map offset temperature coop_Q_values]
 
 
 ;;; Entitities
@@ -25,7 +25,7 @@ to setup
   summon-pits
   summon-gold
   summon-exits
-  set epoch (epoch + 1)
+ ; set epoch (epoch + 1)
   set time_steps 0
   set bExit 0
   reset-ticks
@@ -45,6 +45,10 @@ to init-globals
   set epsilon 0.9
   set visited_map init-visited-map
   set temperature 100
+  set win_rate 0
+  set golds init-golds
+;  if (cooperation)
+  set coop_Q_values init-Q-values
 end
 
 to-report init-visited-map
@@ -55,6 +59,10 @@ to-report init-Q-values
   report array:from-list n-values ( world-width  )  [
     array:from-list n-values ( world-height ) [
       array:from-list n-values num_moves [0] ]]
+end
+
+to-report init-golds
+  report array:from-list n-values ( number_of_golds  )  [ list 0 0 ]
 end
 
 to summon-moths
@@ -139,6 +147,10 @@ end
 
 to summon-gold
   let check  0
+  let counter 0
+
+  while [ counter < number_of_golds ]
+  [
   let some_ycor 0
   set some_ycor random-pycor
   let some_xcor 0
@@ -148,7 +160,7 @@ to summon-gold
         set some_ycor random-pycor
         set some_xcor random-pxcor
     ]
-  if ( [pcolor] of patch some_xcor some_ycor = brown)
+  if ( [pcolor] of patch some_xcor some_ycor = brown) or ( [pcolor] of patch some_xcor some_ycor = yellow)
   [ set check 1]
   while [ check = 1]
   [
@@ -156,14 +168,16 @@ to summon-gold
     set some_ycor random-pycor
     set some_xcor random-pxcor
     set check 0
-    if ( [pcolor] of patch some_xcor some_ycor = brown)
+    if ( [pcolor] of patch some_xcor some_ycor = brown) or ( [pcolor] of patch some_xcor some_ycor = yellow)
     [ set check 1]
   ]
 
-
+  set-gold some_xcor some_ycor counter
   set gold_x some_xcor
   set gold_y some_ycor
   ask patch some_xcor some_ycor [ set pcolor yellow]
+   set counter (counter + 1 )
+  ]
 
 end
 
@@ -175,37 +189,72 @@ to go
   ifelse ( can-exit = 0 ) or ( not any? moths with [hidden? = false ])
   [
 
-    ifelse (can-exit = 0)[print ("moths won!")][print("game over")]
+    ifelse (can-exit = 0)[print ("moths won!")
+      set win_rate win_rate + 1;
+    ]
+    [      print("game over")]
+    ifelse (move_algo = "Reactive")
+      [ clear-turtles
+        clear-patches
+      ;  clear-all
+  set-world-size
+  set currentTurtle 0
+  set num_moves 5
+  set epoch epoch + 1
+  set epsilon 0.9
+  set visited_map init-visited-map
+  set temperature 100
+  ;set win_rate 0
+  set golds init-golds
+  summon-moths
+  summon-pits
+  summon-gold
+  summon-exits
+          set time_steps 0
+  set bExit 0
+          reset-ticks
 
-    ;reset
-    clear-turtles
-    setup
+
+    ]
+    [
+    reset
+    ]
+  ]
+  [
     if epoch >= max_epochs
     [stop]
-  ]
 
-  [
+
     agent-loop
     set time_steps (time_steps + 1)
   ]
   tick
+
 end
 
-;to reset
-;  ask moths [
-;   set xcor init_xcor
-;   set ycor init_ycor
-;   set has_gold 0
-;   set total_reward 0
-;   set hidden? false
-;  ]
-;   ;; new pits ?
-;   set epoch (epoch + 1)
-;   set time_steps 0
-;   set bExit 0
-;   ask patch gold_x gold_y [set pcolor yellow]
-;   set visited_map init-visited-map
-;end
+to reset
+  ask moths [
+
+   set xcor init_xcor
+   set ycor init_ycor
+   set has_gold 0
+
+   set-current-plot "total_reward_in_epoch"
+   set-current-plot-pen (word who "reward")
+    ifelse total_reward < -5000
+    [ plot -5000]
+    [ plot total_reward ]
+   set total_reward 0
+   set hidden? false
+  ]
+   ;; new pits ?
+  reinit-gold
+   set epoch (epoch + 1)
+   set time_steps 0
+   set bExit 0
+   ask patch gold_x gold_y [set pcolor yellow]
+  ; set visited_map init-visited-map
+end
 
 ;to go
 ;  if can-exit = 0 [stop]
@@ -309,15 +358,31 @@ to go-right
 end
 
 to go-grab
-  ifelse xcor = gold_x
- [ if ycor = gold_y
-    [
-      ask patch gold_x gold_y [set pcolor black]
-      ask moth currentTurtle [ set has_gold 1 ]
-    ]]
+  if ( [has_gold] of moth currentTurtle = 0 )
   [
+    let x_cor ([xcor] of turtle currentTurtle)
+    let y_cor ([ycor] of turtle currentTurtle)
+    if( ([pcolor] of patch x_cor y_cor) = yellow )
+     [ ask moth currentTurtle [set has_gold 1]
+        ask patch x_cor y_cor [ set pcolor black]
+    ]
+
   ]
 end
+
+;to go-grab
+;  if ( [has_gold] of moth currentTurtle = 0 )
+;  [
+;  ifelse xcor = gold_x
+; [ if ycor = gold_y
+;    [
+;      ask patch gold_x gold_y [set pcolor black]
+;      ask moth currentTurtle [ set has_gold 1 ]
+;    ]]
+;  [
+;  ]
+;  ]
+;end
 
 to pit-fall
   if ( [pcolor] of patch xcor ycor = brown)
@@ -376,13 +441,13 @@ end
 
 to moth-go-grab
   let moth_num to-num your_color
-  if ([xcor] of moth moth_num) = gold_x
+  if ([has_gold] of moth moth_num = 0 )
   [
-    if ([ycor] of moth moth_num) = gold_y
-    [
-      ask patch gold_x gold_y [set pcolor black]
+    if ([pcolor] of patch ( [xcor] of moth moth_num) ([ycor] of moth moth_num) = yellow)
+  [
+      ask patch ( [xcor] of moth moth_num) ([ycor] of moth moth_num) [set pcolor black]
       ask moth moth_num [ set has_gold 1 ]
-    ]
+  ]
   ]
 end
 
@@ -395,6 +460,21 @@ end
 
 
 ;; Environment functions
+
+to reinit-gold
+  let counter 0
+  while [ counter < number_of_golds ]
+  [
+    let gd get-Gold counter
+   ; if (  (( first gd ) = ( [xcor] of turtle currentTurtle) )  and  (( last gd ) = ( [ycor] of turtle currentTurtle)) )
+   ; [
+      ask patch ( first gd ) ( last gd ) [ set pcolor yellow]
+    set counter (counter + 1)
+     ;  ]
+  ]
+
+
+end
 
 to-report get-time-steps
   report time_steps
@@ -445,7 +525,9 @@ to-report next-move [x y]
      [report new-move-e-greedy x y]
      [ifelse move_algo = "Soft"
      [report new-move-soft x y]
-     [report new-move-reactive x y]]
+     [ifelse move_algo = "Naive"
+      [report random 5]
+      [report new-move-reactive x y]]]
 end
 
 to-report new-move-e-greedy [ x y]
@@ -484,8 +566,8 @@ to-report get-reward [ move ]
   ;did it grab the gold
   ifelse move = 4
   [
-  if ( [pcolor] of patch cur_xcor cur_ycor = yellow)
-  [ report 100 ]
+    if ( ( [pcolor] of patch cur_xcor cur_ycor = yellow) and ( [has_gold] of turtle currentTurtle  = 0) )
+  [ report 1000 ]
   ]
   [ report -10]
 
@@ -493,35 +575,35 @@ to-report get-reward [ move ]
   ifelse move = 0
    [
       if cur_ycor = (- offset - 1)
-      [report -15] ; hit the wall
+      [report -5] ; hit the wall
   ]
   [ifelse move = 1
     [
       if cur_xcor = (offset + 1)
-      [report -15] ; hit the wall
+      [report -5] ; hit the wall
     ]
     [ifelse move = 2
       [
         if cur_ycor = (offset + 1)
-        [report -15] ; hit the wall
+        [report -5] ; hit the wall
       ]
         [
         if cur_xcor = (- offset - 1)
-        [report -15] ; hit the wall
+        [report -5] ; hit the wall
          ]]]
 
 
   ;did it fall into a pit
    if ( [pcolor] of patch cur_xcor cur_ycor = brown)
-  [ report -250 ]
+  [ report -100 ]
 
   ;did it sense a breeze
      if ( [pcolor] of patch cur_xcor cur_ycor = cyan)
-  [ report -5]
+  [ report -15]
 
   ; did it exit with a gold
   if ( [pcolor] of patch cur_xcor cur_ycor = red ) and ([has_Gold] of moth currentTurtle = 1)
-  [ report 1000]
+  [ report 10000]
 
 
   ;; case when hitting another agent
@@ -724,7 +806,7 @@ to-report update-neighbors [x y]
     ]
   ]
 
-  if (col = yellow)
+  if (col = yellow) and ( [has_gold] of turtle CurrentTurtle = 0)
   [
     report 1
   ]
@@ -837,17 +919,43 @@ to set-cell-grey [x y]
   ]
 end
 
+
+to-report get-Gold [ x]
+  report array:item golds x
+end
+
+
+to set-gold [x y pos]
+   array:set golds pos  (list x y )
+end
+
 to-report get-Q-values [x y]
-  report array:item (array:item ( [Q_values] of moth currentTurtle ) (coord-to-idx x))( coord-to-idx y)
+  ifelse (cooperation)
+  [ report array:item (array:item ( coop_Q_values ) (coord-to-idx x))( coord-to-idx y) ]
+  [report array:item (array:item ( [Q_values] of moth currentTurtle ) (coord-to-idx x))( coord-to-idx y) ]
 end
 
 to-report get-Q-value [x y move]
-  report array:item ( array:item (array:item ( [Q_values] of moth currentTurtle ) (coord-to-idx x))( coord-to-idx y) ) move
+    ifelse (cooperation)
+  [ report array:item ( array:item (array:item ( [Q_values] of moth currentTurtle ) (coord-to-idx x))( coord-to-idx y) ) move]
+  [report array:item ( array:item (array:item ( [Q_values] of moth currentTurtle ) (coord-to-idx x))( coord-to-idx y) ) move ]
 end
+
+to reset-Q-value
+
+  set coop_Q_values init-Q-values
+  ask turtles [ set Q_values init-Q-values]
+
+end
+
 
 ;; sets the value for the current agent
 to set-agent-Q-value [x y move val ]
  ask moth currentTurtle [ array:set (get-Q-values x  y  ) move val]
+end
+
+to set-Q-value [x y move val]
+   array:set (get-Q-values x  y  ) move val
 end
 
 to-report to-num [chosen_value]
@@ -871,8 +979,8 @@ end
 GRAPHICS-WINDOW
 210
 10
-439
-240
+491
+292
 -1
 -1
 13.0
@@ -885,10 +993,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--8
-8
--8
-8
+-10
+10
+-10
+10
 1
 1
 1
@@ -896,10 +1004,10 @@ ticks
 30.0
 
 BUTTON
-14
-20
-78
-53
+17
+10
+81
+43
 Setup
 setup
 NIL
@@ -913,10 +1021,10 @@ NIL
 1
 
 BUTTON
-355
-345
-420
-378
+359
+326
+424
+359
 right
 moth-go-right\n
 NIL
@@ -930,10 +1038,10 @@ NIL
 1
 
 BUTTON
-215
-347
-278
-380
+221
+321
+284
+354
 left
 moth-go-left
 NIL
@@ -947,10 +1055,10 @@ NIL
 1
 
 BUTTON
-285
-305
-348
-338
+292
+298
+355
+331
 up
 moth-go-up\n
 NIL
@@ -964,10 +1072,10 @@ NIL
 1
 
 BUTTON
-282
-388
-352
-421
+288
+338
+358
+371
 down
 moth-go-down
 NIL
@@ -981,10 +1089,10 @@ NIL
 1
 
 BUTTON
-80
-20
-143
-53
+83
+10
+146
+43
 go
 go
 T
@@ -998,10 +1106,10 @@ NIL
 1
 
 BUTTON
-440
-345
-505
-378
+220
+360
+285
+393
 grab
 moth-go-grab
 NIL
@@ -1015,15 +1123,15 @@ NIL
 1
 
 SLIDER
-14
-65
-186
-98
+13
+78
+185
+111
 pit_count
 pit_count
 0
 10
-1.0
+5.0
 1
 1
 NIL
@@ -1031,14 +1139,14 @@ HORIZONTAL
 
 SLIDER
 13
-108
+113
 185
-141
+146
 max_epochs
 max_epochs
 0
-100
-99.0
+1000
+1000.0
 1
 1
 NIL
@@ -1046,12 +1154,12 @@ HORIZONTAL
 
 CHOOSER
 12
-245
+263
 150
-290
+308
 move_algo
 move_algo
-"Greedy" "Soft" "Reactive"
+"Greedy" "Soft" "Reactive" "Naive"
 2
 
 CHOOSER
@@ -1062,13 +1170,13 @@ CHOOSER
 reward_algo
 reward_algo
 "Q learning" "SARSA"
-0
+1
 
 SLIDER
 13
-198
+215
 185
-231
+248
 learning_rate
 learning_rate
 0
@@ -1081,24 +1189,24 @@ HORIZONTAL
 
 SLIDER
 13
-149
+181
 185
-182
+214
 discount_factor
 discount_factor
 0
 1
-0.85
+0.77
 0.01
 1
 NIL
 HORIZONTAL
 
 MONITOR
-523
-34
-594
-79
+497
+10
+568
+55
 time-steps
 get-time-steps
 17
@@ -1106,61 +1214,160 @@ get-time-steps
 11
 
 CHOOSER
-524
-147
-663
-192
+506
+221
+645
+266
 your_color
 your_color
 "white" "blue" "green" "pink"
 2
 
 CHOOSER
-523
-94
-661
-139
+506
+176
+644
+221
 world-size
 world-size
 "9 x 9" "13 x 13" "17 x 17" "21 x 21"
 3
 
+MONITOR
+505
+63
+562
+108
+epoch
+epoch
+17
+1
+11
+
+BUTTON
+18
+44
+113
+77
+reset-Q-val
+reset-Q-value\nset win_rate 0\nset epoch 0\n
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+MONITOR
+505
+116
+562
+161
+Wins
+win_rate
+17
+1
+11
+
+PLOT
+686
+12
+1140
+252
+total_reward_in_epoch
+epoch
+reward
+0.0
+1000.0
+-5000.0
+1000.0
+true
+false
+"ask moths [\n  let pen-name (word who \"reward\")\n  create-temporary-plot-pen pen-name\n  set-current-plot-pen pen-name\n  set-plot-pen-color color\n]" ""
+PENS
+
+SWITCH
+13
+359
+137
+392
+Cooperation
+Cooperation
+1
+1
+-1000
+
+SLIDER
+13
+147
+185
+180
+number_of_golds
+number_of_golds
+1
+10
+2.0
+1
+1
+NIL
+HORIZONTAL
+
+BUTTON
+114
+44
+177
+77
+go-
+go
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+A multi-agent version of the Wumpus World game. The monster is removed for simplicity. There are few different Reinforcement learning algorithms implemented. Specifically Sarsa and Qlearning, with Greedy and Soft-max move decision algorithms. ALso there is a reactive version of the world and naive one.
 
 ## HOW IT WORKS
 
-(what rules the agents use to create the overall behavior of the model)
+For Reinforcement They fill Q-learning matrix. They can work all together or everyone for themselves. Cooperation switch is responsible for determining that.
 
 ## HOW TO USE IT
 
-(how to use the model, including a description of each of the items in the Interface tab)
+Setup- sets the scene up.
+go - will triger the model. it will reinitiate everything and run it again until it reaches the maximal ammount. ( you can control maximal amount by epoch slider.) 
+For reactive model it generates a new map in each model.
+reset-Q-vals will set the Q-value matrix to 0's allowing us to run different learning model in the same environment. it also will set winning rate and epochs to 0.
+pit_count will control the amount of pits in our world.
+max_epochs will control how many time the model will be used for training.
+discoutn_factor and learning_rate are variables between 0 and 1 used for learning algorithms. They determine how effective is the algorithm, how inclined to high valued moveds the agent should be, and what is the affect of the new move in the q-values.
+move_algo has four options "Greedy" "Soft-max" "Naive" "Reactive" you can choose the desired movement algorithm with it. WHile greedy and soft-max will be tightly connected with learning algorithms, the other two are independent.
+reward_algo determines how q-values are changed. It is basically the learning algorithms. We have "Q-learning" and "Sarsa" algorithms.
+Cooperation determines if agents share one matrix for Q-values or each stores their own.
+left,up,right,bottom,grab bottons control a specific agent. you can determine the agent you want to control by "Your_color" chooser.
+"word_size" allows you to change the world size. there are few determined sizes.
+time_steps count how many iterations agents had in each epoch. Epoch is self-explanatory.
+wins determines how many times agents had won the game. 
+Lastly, the plot will plot each agents total reward by the end of the game.
 
 ## THINGS TO NOTICE
 
-(suggested things for the user to notice while running the model)
+Surprisingly cooperation doesn't give good result for the cases when the gold is fewer than the agents. The reason for it is that agents all learn to grab the golds and the ones left without gold are left to wonder in the environment.
 
-## THINGS TO TRY
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
-
-## EXTENDING THE MODEL
-
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
-
-## NETLOGO FEATURES
-
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
-
-## RELATED MODELS
-
-(models in the NetLogo Models Library and elsewhere which are of related interest)
 
 ## CREDITS AND REFERENCES
 
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+The model was made during "AAMAS: Autonomous agents and multi-agent systems" Course in IST, Portugal by Aram Serobyan and Olena Mashkina. 
 @#$#@#$#@
 default
 true
